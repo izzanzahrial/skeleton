@@ -1,0 +1,17 @@
+version: "3.9"
+services:
+  postgres:
+    image: postgres:latest
+    container_name: skeleton_db
+    environment:
+      - POSTGRES_PASSWORD=skeleton
+      - POSTGRES_USER=skeleton
+      - POSTGRES_DB=skeletonDB
+      - PGTZ=Asia/Jakarta
+    ports:
+      - 5432:5432
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
