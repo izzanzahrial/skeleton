@@ -36,9 +36,10 @@ func (s *Service) CreateUser(ctx context.Context, email, username, password stri
 
 	user := db.CreateUserParams{
 		Email:        email,
-		Username:     username,
+		Username:     pgtype.Text{String: username, Valid: true},
 		PasswordHash: passHash,
 		Role:         db.RolesUser,
+		Origin:       db.OriginsNative,
 	}
 
 	newUser, err := s.repo.CreateUser(ctx, user)
@@ -58,9 +59,10 @@ func (s *Service) CreateAdmin(ctx context.Context, email, username, password str
 
 	user := db.CreateUserParams{
 		Email:        email,
-		Username:     username,
+		Username:     pgtype.Text{String: username, Valid: true},
 		PasswordHash: passHash,
 		Role:         db.RolesAdmin,
+		Origin:       db.OriginsNative,
 	}
 
 	newUser, err := s.repo.CreateUser(ctx, user)
@@ -114,7 +116,7 @@ func (s *Service) GetUsersLikeUsername(ctx context.Context, username string, lim
 		newLimit.Valid = true
 	}
 
-	users, err := s.repo.GetUsersLikeUsername(ctx, db.GetUsersLikeUsernameParams{Username: wildcard, LimitArg: newLimit, Offset: offset})
+	users, err := s.repo.GetUsersLikeUsername(ctx, db.GetUsersLikeUsernameParams{Username: pgtype.Text{String: wildcard, Valid: true}, LimitArg: newLimit, Offset: offset})
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +125,7 @@ func (s *Service) GetUsersLikeUsername(ctx context.Context, username string, lim
 }
 
 func (s *Service) GetuserByEmailOrUsername(ctx context.Context, email, username string) (model.User, error) {
-	user, err := s.repo.GetuserByEmailOrUsername(ctx, db.GetuserByEmailOrUsernameParams{Email: email, Username: username})
+	user, err := s.repo.GetuserByEmailOrUsername(ctx, db.GetuserByEmailOrUsernameParams{Email: email, Username: pgtype.Text{String: username, Valid: true}})
 	if err != nil {
 		return model.User{}, err
 	}

@@ -13,6 +13,13 @@ const (
 	RolesUser  Roles = "user"
 )
 
+type Origins string
+
+const (
+	NativeOrigin Origins = "native"
+	GoogleOrigin Origins = "google"
+)
+
 type User struct {
 	ID           int64     `json:"id"`
 	CreatedAt    time.Time `json:"created_at"`
@@ -21,7 +28,12 @@ type User struct {
 	Email        string    `json:"email"`
 	Username     string    `json:"username"`
 	PasswordHash []byte    `json:"password_hash"`
+	FirstName    string    `json:"first_name"`
+	LastName     string    `json:"last_name"`
+	PictureUrl   string    `json:"picture_url"`
+	RefreshToken string    `json:"refresh_token"`
 	Role         Roles     `json:"role"`
+	Origin       Origins   `json:"origin"`
 }
 
 // DBUserToModelUser converts a DB user to a model user
@@ -35,9 +47,14 @@ func DBUserToModelUser(users ...db.User) []User {
 			UpdatedAt:    u.UpdatedAt.Time,
 			DeletedAt:    u.DeletedAt.Time,
 			Email:        u.Email,
-			Username:     u.Username,
+			Username:     u.Username.String,
 			PasswordHash: u.PasswordHash,
+			FirstName:    u.FirstName.String,
+			LastName:     u.LastName.String,
+			PictureUrl:   u.PictureUrl.String,
+			RefreshToken: u.RefreshToken.String,
 			Role:         Roles(u.Role),
+			Origin:       Origins(u.Origin),
 		})
 	}
 

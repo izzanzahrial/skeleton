@@ -15,7 +15,14 @@ func MapRoutes(e *echo.Echo, h *handlers.Handlers) {
 }
 
 func mapAuthenticationRoutes(e *echo.Group, h *handlers.Handlers) {
+	// using native authentication
 	e.POST("/login", h.Auth.Login)
+
+	// using google oauth2 authentication
+	// temporary name
+	e.GET("/google", h.Auth.LoginGoogleOAuth)
+	e.GET("/callback", h.Auth.Callback)
+	e.GET("/refresh", h.Auth.RefreshToken)
 }
 
 func mapUserRoutes(e *echo.Group, h *handlers.Handlers) {
