@@ -3,9 +3,10 @@ INSERT INTO users (
     email,
     username,
     password_hash,
-    role
+    role,
+    origin
 ) VALUES (
-    $1, $2, $3, $4
+    $1, $2, $3, $4, $5
 ) RETURNING *;
 
 -- name: GetUser :one
@@ -66,3 +67,22 @@ RETURNING *;
 UPDATE users
 SET deleted_at = now()
 WHERE id = $1 AND deleted_at IS NULL;
+
+-- name: CreateUserGoogle :one
+INSERT INTO users (
+    email,
+    first_name,
+    last_name,
+    picture_url,
+    refresh_token,
+    role,
+    origin
+) VALUES (
+    $1, $2, $3, $4, $5, $6, $7
+) RETURNING *;
+
+-- name: GetuserByEmail :one
+SELECT * FROM users 
+WHERE (email = $1 OR $1 = '')
+AND deleted_at IS NULL
+LIMIT 1;

@@ -16,17 +16,19 @@ INSERT INTO users (
     email,
     username,
     password_hash,
-    role
+    role,
+    origin
 ) VALUES (
-    $1, $2, $3, $4
-) RETURNING id, created_at, updated_at, deleted_at, email, username, password_hash, role
+    $1, $2, $3, $4, $5
+) RETURNING id, created_at, updated_at, deleted_at, email, username, password_hash, role, first_name, last_name, picture_url, refresh_token, origin
 `
 
 type CreateUserParams struct {
-	Email        string `json:"email"`
-	Username     string `json:"username"`
-	PasswordHash []byte `json:"password_hash"`
-	Role         Roles  `json:"role"`
+	Email        string      `json:"email"`
+	Username     pgtype.Text `json:"username"`
+	PasswordHash []byte      `json:"password_hash"`
+	Role         Roles       `json:"role"`
+	Origin       Origins     `json:"origin"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
@@ -35,6 +37,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		arg.Username,
 		arg.PasswordHash,
 		arg.Role,
+		arg.Origin,
 	)
 	var i User
 	err := row.Scan(
@@ -46,6 +49,64 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.Username,
 		&i.PasswordHash,
 		&i.Role,
+		&i.FirstName,
+		&i.LastName,
+		&i.PictureUrl,
+		&i.RefreshToken,
+		&i.Origin,
+	)
+	return i, err
+}
+
+const createUserGoogle = `-- name: CreateUserGoogle :one
+INSERT INTO users (
+    email,
+    first_name,
+    last_name,
+    picture_url,
+    refresh_token,
+    role,
+    origin
+) VALUES (
+    $1, $2, $3, $4, $5, $6, $7
+) RETURNING id, created_at, updated_at, deleted_at, email, username, password_hash, role, first_name, last_name, picture_url, refresh_token, origin
+`
+
+type CreateUserGoogleParams struct {
+	Email        string      `json:"email"`
+	FirstName    pgtype.Text `json:"first_name"`
+	LastName     pgtype.Text `json:"last_name"`
+	PictureUrl   pgtype.Text `json:"picture_url"`
+	RefreshToken pgtype.Text `json:"refresh_token"`
+	Role         Roles       `json:"role"`
+	Origin       Origins     `json:"origin"`
+}
+
+func (q *Queries) CreateUserGoogle(ctx context.Context, arg CreateUserGoogleParams) (User, error) {
+	row := q.db.QueryRow(ctx, createUserGoogle,
+		arg.Email,
+		arg.FirstName,
+		arg.LastName,
+		arg.PictureUrl,
+		arg.RefreshToken,
+		arg.Role,
+		arg.Origin,
+	)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+		&i.Email,
+		&i.Username,
+		&i.PasswordHash,
+		&i.Role,
+		&i.FirstName,
+		&i.LastName,
+		&i.PictureUrl,
+		&i.RefreshToken,
+		&i.Origin,
 	)
 	return i, err
 }
@@ -62,7 +123,7 @@ func (q *Queries) DeleteUser(ctx context.Context, id int64) error {
 }
 
 const getUser = `-- name: GetUser :one
-SELECT id, created_at, updated_at, deleted_at, email, username, password_hash, role FROM users 
+SELECT id, created_at, updated_at, deleted_at, email, username, password_hash, role, first_name, last_name, picture_url, refresh_token, origin FROM users 
 WHERE id = $1 LIMIT 1
 `
 
@@ -78,12 +139,17 @@ func (q *Queries) GetUser(ctx context.Context, id int64) (User, error) {
 		&i.Username,
 		&i.PasswordHash,
 		&i.Role,
+		&i.FirstName,
+		&i.LastName,
+		&i.PictureUrl,
+		&i.RefreshToken,
+		&i.Origin,
 	)
 	return i, err
 }
 
 const getUserForUpdate = `-- name: GetUserForUpdate :one
-SELECT id, created_at, updated_at, deleted_at, email, username, password_hash, role FROM users 
+SELECT id, created_at, updated_at, deleted_at, email, username, password_hash, role, first_name, last_name, picture_url, refresh_token, origin FROM users 
 WHERE id = $1 LIMIT 1 
 FOR UPDATE
 `
@@ -100,12 +166,17 @@ func (q *Queries) GetUserForUpdate(ctx context.Context, id int64) (User, error) 
 		&i.Username,
 		&i.PasswordHash,
 		&i.Role,
+		&i.FirstName,
+		&i.LastName,
+		&i.PictureUrl,
+		&i.RefreshToken,
+		&i.Origin,
 	)
 	return i, err
 }
 
 const getUsersByRole = `-- name: GetUsersByRole :many
-SELECT id, created_at, updated_at, deleted_at, email, username, password_hash, role FROM users
+SELECT id, created_at, updated_at, deleted_at, email, username, password_hash, role, first_name, last_name, picture_url, refresh_token, origin FROM users
 WHERE role = $1 AND deleted_at IS NULL
 ORDER BY id DESC
 LIMIT COALESCE($3::int, 10) 
@@ -136,6 +207,11 @@ func (q *Queries) GetUsersByRole(ctx context.Context, arg GetUsersByRoleParams) 
 			&i.Username,
 			&i.PasswordHash,
 			&i.Role,
+			&i.FirstName,
+			&i.LastName,
+			&i.PictureUrl,
+			&i.RefreshToken,
+			&i.Origin,
 		); err != nil {
 			return nil, err
 		}
@@ -148,7 +224,7 @@ func (q *Queries) GetUsersByRole(ctx context.Context, arg GetUsersByRoleParams) 
 }
 
 const getUsersLikeUsername = `-- name: GetUsersLikeUsername :many
-SELECT id, created_at, updated_at, deleted_at, email, username, password_hash, role FROM users
+SELECT id, created_at, updated_at, deleted_at, email, username, password_hash, role, first_name, last_name, picture_url, refresh_token, origin FROM users
 WHERE username ILIKE $1
 ORDER BY id DESC
 LIMIT COALESCE($3::int, 10) 
@@ -156,7 +232,7 @@ OFFSET $2
 `
 
 type GetUsersLikeUsernameParams struct {
-	Username string      `json:"username"`
+	Username pgtype.Text `json:"username"`
 	Offset   int32       `json:"offset"`
 	LimitArg pgtype.Int4 `json:"limit_arg"`
 }
@@ -179,6 +255,11 @@ func (q *Queries) GetUsersLikeUsername(ctx context.Context, arg GetUsersLikeUser
 			&i.Username,
 			&i.PasswordHash,
 			&i.Role,
+			&i.FirstName,
+			&i.LastName,
+			&i.PictureUrl,
+			&i.RefreshToken,
+			&i.Origin,
 		); err != nil {
 			return nil, err
 		}
@@ -190,8 +271,36 @@ func (q *Queries) GetUsersLikeUsername(ctx context.Context, arg GetUsersLikeUser
 	return items, nil
 }
 
+const getuserByEmail = `-- name: GetuserByEmail :one
+SELECT id, created_at, updated_at, deleted_at, email, username, password_hash, role, first_name, last_name, picture_url, refresh_token, origin FROM users 
+WHERE (email = $1 OR $1 = '')
+AND deleted_at IS NULL
+LIMIT 1
+`
+
+func (q *Queries) GetuserByEmail(ctx context.Context, email string) (User, error) {
+	row := q.db.QueryRow(ctx, getuserByEmail, email)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+		&i.Email,
+		&i.Username,
+		&i.PasswordHash,
+		&i.Role,
+		&i.FirstName,
+		&i.LastName,
+		&i.PictureUrl,
+		&i.RefreshToken,
+		&i.Origin,
+	)
+	return i, err
+}
+
 const getuserByEmailOrUsername = `-- name: GetuserByEmailOrUsername :one
-SELECT id, created_at, updated_at, deleted_at, email, username, password_hash, role FROM users 
+SELECT id, created_at, updated_at, deleted_at, email, username, password_hash, role, first_name, last_name, picture_url, refresh_token, origin FROM users 
 WHERE (email = $1 OR $1 = '')
 AND (username = $2 OR $2 = '')
 AND deleted_at IS NULL
@@ -199,8 +308,8 @@ LIMIT 1
 `
 
 type GetuserByEmailOrUsernameParams struct {
-	Email    string `json:"email"`
-	Username string `json:"username"`
+	Email    string      `json:"email"`
+	Username pgtype.Text `json:"username"`
 }
 
 func (q *Queries) GetuserByEmailOrUsername(ctx context.Context, arg GetuserByEmailOrUsernameParams) (User, error) {
@@ -215,6 +324,11 @@ func (q *Queries) GetuserByEmailOrUsername(ctx context.Context, arg GetuserByEma
 		&i.Username,
 		&i.PasswordHash,
 		&i.Role,
+		&i.FirstName,
+		&i.LastName,
+		&i.PictureUrl,
+		&i.RefreshToken,
+		&i.Origin,
 	)
 	return i, err
 }
@@ -223,7 +337,7 @@ const updateUserEmail = `-- name: UpdateUserEmail :one
 UPDATE users
 SET email = $1
 WHERE id = $2 AND deleted_at IS NULL
-RETURNING id, created_at, updated_at, deleted_at, email, username, password_hash, role
+RETURNING id, created_at, updated_at, deleted_at, email, username, password_hash, role, first_name, last_name, picture_url, refresh_token, origin
 `
 
 type UpdateUserEmailParams struct {
@@ -243,6 +357,11 @@ func (q *Queries) UpdateUserEmail(ctx context.Context, arg UpdateUserEmailParams
 		&i.Username,
 		&i.PasswordHash,
 		&i.Role,
+		&i.FirstName,
+		&i.LastName,
+		&i.PictureUrl,
+		&i.RefreshToken,
+		&i.Origin,
 	)
 	return i, err
 }
@@ -251,7 +370,7 @@ const updateUserPassword = `-- name: UpdateUserPassword :one
 UPDATE users
 SET password_hash = $1
 WHERE id = $2 AND deleted_at IS NULL
-RETURNING id, created_at, updated_at, deleted_at, email, username, password_hash, role
+RETURNING id, created_at, updated_at, deleted_at, email, username, password_hash, role, first_name, last_name, picture_url, refresh_token, origin
 `
 
 type UpdateUserPasswordParams struct {
@@ -271,6 +390,11 @@ func (q *Queries) UpdateUserPassword(ctx context.Context, arg UpdateUserPassword
 		&i.Username,
 		&i.PasswordHash,
 		&i.Role,
+		&i.FirstName,
+		&i.LastName,
+		&i.PictureUrl,
+		&i.RefreshToken,
+		&i.Origin,
 	)
 	return i, err
 }
@@ -279,7 +403,7 @@ const updateUserRole = `-- name: UpdateUserRole :one
 UPDATE users
 SET role = $1
 WHERE id = $2 AND deleted_at IS NULL
-RETURNING id, created_at, updated_at, deleted_at, email, username, password_hash, role
+RETURNING id, created_at, updated_at, deleted_at, email, username, password_hash, role, first_name, last_name, picture_url, refresh_token, origin
 `
 
 type UpdateUserRoleParams struct {
@@ -299,6 +423,11 @@ func (q *Queries) UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) 
 		&i.Username,
 		&i.PasswordHash,
 		&i.Role,
+		&i.FirstName,
+		&i.LastName,
+		&i.PictureUrl,
+		&i.RefreshToken,
+		&i.Origin,
 	)
 	return i, err
 }
@@ -307,12 +436,12 @@ const updateUserUsername = `-- name: UpdateUserUsername :one
 UPDATE users
 SET username = $1
 WHERE id = $2 AND deleted_at IS NULL
-RETURNING id, created_at, updated_at, deleted_at, email, username, password_hash, role
+RETURNING id, created_at, updated_at, deleted_at, email, username, password_hash, role, first_name, last_name, picture_url, refresh_token, origin
 `
 
 type UpdateUserUsernameParams struct {
-	Username string `json:"username"`
-	ID       int64  `json:"id"`
+	Username pgtype.Text `json:"username"`
+	ID       int64       `json:"id"`
 }
 
 func (q *Queries) UpdateUserUsername(ctx context.Context, arg UpdateUserUsernameParams) (User, error) {
@@ -327,6 +456,11 @@ func (q *Queries) UpdateUserUsername(ctx context.Context, arg UpdateUserUsername
 		&i.Username,
 		&i.PasswordHash,
 		&i.Role,
+		&i.FirstName,
+		&i.LastName,
+		&i.PictureUrl,
+		&i.RefreshToken,
+		&i.Origin,
 	)
 	return i, err
 }
