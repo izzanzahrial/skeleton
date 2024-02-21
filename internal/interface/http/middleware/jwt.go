@@ -12,7 +12,25 @@ import (
 	"github.com/izzanzahrial/skeleton/pkg/token"
 )
 
+// using authorization headers but from echo
 func IsAuthorize(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		tkn := c.Get("user").(*jwt.Token)
+		claims, ok := tkn.Claims.(*token.JwtCustomClaims)
+		if !ok && !tkn.Valid {
+			return echo.NewHTTPError(http.StatusUnauthorized)
+		}
+
+		if claims.Role != model.RolesAdmin {
+			return echo.NewHTTPError(http.StatusUnauthorized)
+		}
+
+		return next(c)
+	}
+}
+
+// using authorization header
+func IsAuthorizeHeader(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		authtoken := c.Request().Header.Get("Authorization")
 		if authtoken == "" {
@@ -42,7 +60,6 @@ func IsAuthorize(next echo.HandlerFunc) echo.HandlerFunc {
 }
 
 func IsAuthenticated() echo.MiddlewareFunc {
-
 	config := echojwt.Config{
 		NewClaimsFunc: func(c echo.Context) jwt.Claims {
 			return new(token.JwtCustomClaims)

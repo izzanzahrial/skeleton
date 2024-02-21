@@ -2,13 +2,13 @@ package authentication
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 
 	db "github.com/izzanzahrial/skeleton/db/sqlc"
 	"github.com/izzanzahrial/skeleton/internal/model"
 	pass "github.com/izzanzahrial/skeleton/pkg/password"
 	"github.com/izzanzahrial/skeleton/pkg/token"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -58,7 +58,7 @@ func (s *Service) CreateOrCheckGoogleUser(ctx context.Context, user model.User) 
 		return model.DBUserToModelUser(dbUser)[0], nil
 	}
 
-	if !errors.Is(err, sql.ErrNoRows) {
+	if !errors.Is(err, pgx.ErrNoRows) {
 		return model.User{}, err
 	}
 

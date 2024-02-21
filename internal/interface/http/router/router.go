@@ -27,8 +27,8 @@ func mapAuthenticationRoutes(e *echo.Group, h *handlers.Handlers) {
 
 func mapUserRoutes(e *echo.Group, h *handlers.Handlers) {
 	e.POST("/signup", h.User.Signup)
-	e.POST("/signup-admin", h.User.SignUpAdmin, middleware.IsAuthorize)
-	e.GET("/users/:role", h.User.GetUsersByRole, middleware.IsAuthorize)
-	e.GET("/users", h.User.GetUsersLikeUsername, middleware.IsAuthorize)
+	e.POST("/signup-admin", h.User.SignUpAdmin, middleware.IsAuthenticated(), middleware.IsAuthorize)
+	e.GET("/users/:role", h.User.GetUsersByRole, middleware.IsAuthenticated(), middleware.IsAuthorize)
+	e.GET("/users", h.User.GetUsersLikeUsername, middleware.IsAuthenticated(), middleware.IsAuthorize)
 	e.DELETE("/users", h.User.DeleteUser)
 }
