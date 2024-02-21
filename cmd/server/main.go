@@ -7,6 +7,7 @@ import (
 	"github.com/izzanzahrial/skeleton/config"
 	db "github.com/izzanzahrial/skeleton/db/sqlc"
 	"github.com/izzanzahrial/skeleton/internal/domain/authentication/cache"
+	"github.com/izzanzahrial/skeleton/internal/interface/http/auth0"
 	authhandler "github.com/izzanzahrial/skeleton/internal/interface/http/authentication"
 	"github.com/izzanzahrial/skeleton/internal/interface/http/handlers"
 	"github.com/izzanzahrial/skeleton/internal/interface/http/router"
@@ -48,8 +49,13 @@ func main() {
 	db := db.New(conn)
 	cache := cache.New(rdb)
 
+	auht0, err := auth0.New()
+	if err != nil {
+		log.Panicf("failed to create auth0: %v", err)
+	}
+
 	authService := authentication.NewService(db, cache)
-	authHandler := authhandler.NewHandler(authService)
+	authHandler := authhandler.NewHandler(authService, auht0)
 
 	userService := user.NewService(db)
 	userHandler := userhandler.NewHandler(userService)

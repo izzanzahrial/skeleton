@@ -3,8 +3,10 @@ package authentication
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 
+	"github.com/izzanzahrial/skeleton/internal/interface/http/auth0"
 	"github.com/izzanzahrial/skeleton/internal/model"
 	"github.com/izzanzahrial/skeleton/pkg/token"
 	"github.com/labstack/echo/v4"
@@ -19,10 +21,11 @@ type authService interface {
 
 type Handler struct {
 	service authService
+	auht0   *auth0.Authenticator
 }
 
-func NewHandler(service authService) *Handler {
-	return &Handler{service: service}
+func NewHandler(service authService, auth0 *auth0.Authenticator) *Handler {
+	return &Handler{service: service, auht0: auth0}
 }
 
 func (h *Handler) Login(c echo.Context) error {
@@ -113,10 +116,47 @@ func (h *Handler) RefreshToken(c echo.Context) error {
 	// fmt.Println("refresh_token: ", refreshToken)
 	refreshToken := c.FormValue("refresh")
 
+	// TODO: add check for different origin
+	// native origin
+
+	// google origin
 	newtoken := googleOauthConfig.TokenSource(context.Background(), &oauth2.Token{RefreshToken: refreshToken})
 	token, err := newtoken.Token()
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadGateway, err)
 	}
+
+	// generate new jwt from token
 	return c.JSON(http.StatusOK, token)
+}
+
+func (h *Handler) LoginAuth0(c echo.Context) error {
+	// TODO: generate state
+	return c.Redirect(http.StatusTemporaryRedirect, h.auht0.AuthCodeURL("temp"))
+}
+
+func (h *Handler) CallbackAuth0(c echo.Context) error {
+	if c.QueryParam("state") == "temp" {
+		return c.JSON(http.StatusBadRequest, "invalid state parameter")
+	}
+
+	token, err := h.auht0.Exchange(context.Background(), c.QueryParam("code"))
+	if err != nil {
+		return c.JSON(http.StatusUnauthorized, "failed to exchange an authorization code for a token")
+	}
+
+	idToken, err := h.auht0.VerifyIDToken(context.Background(), token)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, "failed to verify the ID token")
+	}
+
+	var profile map[string]interface{}
+	if err := idToken.Claims(&profile); err != nil {
+		return c.JSON(http.StatusInternalServerError, err)
+	}
+
+	log.Println(token)
+	log.Println(profile)
+	// TODO: redirect to somewhere else
+	return c.Redirect(http.StatusTemporaryRedirect, "/")
 }
