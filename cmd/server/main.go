@@ -14,6 +14,7 @@ import (
 	userhandler "github.com/izzanzahrial/skeleton/internal/interface/http/user"
 	"github.com/izzanzahrial/skeleton/internal/service/authentication"
 	"github.com/izzanzahrial/skeleton/internal/service/user"
+	pkgvalidator "github.com/izzanzahrial/skeleton/pkg/validator"
 	"github.com/jackc/pgx/v5"
 	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v4"
@@ -62,8 +63,15 @@ func main() {
 
 	handlers := handlers.NewHandlers(authHandler, userHandler)
 
+	cv, err := pkgvalidator.New()
+	if err != nil {
+		log.Panic(err)
+	}
+
 	server := echo.New()
-	server.Use(middleware.Logger(), middleware.Logger())
+	server.Use(middleware.Logger())
+	server.Validator = cv
+
 	router.MapRoutes(server, handlers)
 	if err := server.Start(":" + cfg.Port); err != nil {
 		log.Fatalf("failed to start server: %s", err.Error())
