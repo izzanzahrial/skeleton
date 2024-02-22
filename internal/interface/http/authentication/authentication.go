@@ -3,8 +3,8 @@ package authentication
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"net/http"
+	"os"
 
 	"github.com/izzanzahrial/skeleton/internal/interface/http/auth0"
 	"github.com/izzanzahrial/skeleton/internal/model"
@@ -49,9 +49,9 @@ func (h *Handler) Login(c echo.Context) error {
 }
 
 var googleOauthConfig = &oauth2.Config{
-	ClientID:     "870910343709-gb2o11j3vvp6npv32ef4c3ecphussifh.apps.googleusercontent.com",
-	ClientSecret: "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",
-	RedirectURL:  "http://localhost:8080/api/v1/callback",
+	ClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
+	ClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
+	RedirectURL:  os.Getenv("GOOGLE_REDIRECT_URL"),
 	// Learn more: https://developers.google.com/identity/protocols/oauth2/scopes
 	Scopes:   []string{"https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/userinfo.profile"},
 	Endpoint: google.Endpoint,
@@ -70,18 +70,19 @@ func (h *Handler) Callback(c echo.Context) error {
 	ctx := c.Request().Context()
 
 	state := c.FormValue("state")
+	// TODO: get the generate state
 	if state != "temp" {
 		return echo.ErrBadGateway
 	}
 
 	code := c.FormValue("code")
-	token, err := googleOauthConfig.Exchange(ctx, code)
+	tkn, err := googleOauthConfig.Exchange(ctx, code)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadGateway, err)
 	}
 
-	client := googleOauthConfig.Client(ctx, token)
-	response, err := client.Get("https://www.googleapis.com/oauth2/v3/userinfo")
+	client := googleOauthConfig.Client(ctx, tkn)
+	response, err := client.Get(os.Getenv("GOOGLE_OAUTH_API_URL"))
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadGateway, err)
 	}
@@ -98,7 +99,7 @@ func (h *Handler) Callback(c echo.Context) error {
 		FirstName:    userInfo["given_name"].(string),
 		LastName:     userInfo["name"].(string),
 		PictureUrl:   userInfo["picture"].(string),
-		RefreshToken: token.RefreshToken,
+		RefreshToken: tkn.RefreshToken,
 	}
 
 	newUser, err := h.service.CreateOrCheckGoogleUser(ctx, *user)
@@ -106,14 +107,17 @@ func (h *Handler) Callback(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadGateway, err)
 	}
 
+	jwtToken, err := token.NewJWT(newUser.ID, model.Roles(newUser.Role))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadGateway, err)
+	}
+
 	// TODO: should be redirected to somewhere else
-	return c.JSON(http.StatusCreated, newUser)
+	return c.JSON(http.StatusCreated, echo.Map{"user": user, "token": jwtToken})
 }
 
 func (h *Handler) RefreshToken(c echo.Context) error {
 	// TODO: get refresh token from database
-	// refreshToken := c.Get("refresh_token").(string)
-	// fmt.Println("refresh_token: ", refreshToken)
 	refreshToken := c.FormValue("refresh")
 
 	// TODO: add check for different origin
@@ -126,7 +130,7 @@ func (h *Handler) RefreshToken(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadGateway, err)
 	}
 
-	// generate new jwt from token
+	// TODO: generate new jwt
 	return c.JSON(http.StatusOK, token)
 }
 
@@ -136,7 +140,8 @@ func (h *Handler) LoginAuth0(c echo.Context) error {
 }
 
 func (h *Handler) CallbackAuth0(c echo.Context) error {
-	if c.QueryParam("state") == "temp" {
+	// TODO: get the generated state
+	if c.QueryParam("state") != "temp" {
 		return c.JSON(http.StatusBadRequest, "invalid state parameter")
 	}
 
@@ -155,8 +160,10 @@ func (h *Handler) CallbackAuth0(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, err)
 	}
 
-	log.Println(token)
-	log.Println(profile)
+	// TODO: save the user from profile to database
+
+	// TODO: generate jwt token from user data
+
 	// TODO: redirect to somewhere else
-	return c.Redirect(http.StatusTemporaryRedirect, "/")
+	return c.JSON(http.StatusOK, echo.Map{"token": token, "profile": profile})
 }

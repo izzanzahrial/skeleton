@@ -19,10 +19,14 @@ func mapAuthenticationRoutes(e *echo.Group, h *handlers.Handlers) {
 	e.POST("/login", h.Auth.Login)
 
 	// using google oauth2 authentication
-	// temporary name
 	e.GET("/google", h.Auth.LoginGoogleOAuth)
 	e.GET("/callback", h.Auth.Callback)
 	e.GET("/refresh", h.Auth.RefreshToken)
+
+	// using auth0 authentication
+	e.GET("/auth0", h.Auth.LoginAuth0)
+	e.GET("/callback/auth0", h.Auth.CallbackAuth0)
+
 }
 
 func mapUserRoutes(e *echo.Group, h *handlers.Handlers) {
