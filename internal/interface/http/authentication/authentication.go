@@ -31,11 +31,16 @@ func NewHandler(service authService, auth0 *auth0.Authenticator) *Handler {
 func (h *Handler) Login(c echo.Context) error {
 	ctx := c.Request().Context()
 
-	email := c.FormValue("email")
-	username := c.FormValue("username")
-	password := c.FormValue("password")
+	var request LoginReq
+	if err := c.Bind(&request); err != nil {
+		return c.JSON(http.StatusBadRequest, err.Error())
+	}
 
-	user, err := h.service.GetuserByEmailOrUsername(ctx, email, username, password)
+	if err := c.Validate(&request); err != nil {
+		return c.JSON(http.StatusBadRequest, err.Error())
+	}
+
+	user, err := h.service.GetuserByEmailOrUsername(ctx, request.Email, request.Username, request.Password)
 	if err != nil {
 		return c.JSON(http.StatusNotFound, err.Error())
 	}

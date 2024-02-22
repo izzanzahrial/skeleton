@@ -2,7 +2,6 @@ package user
 
 import (
 	"context"
-	"log"
 	"net/http"
 
 	"github.com/izzanzahrial/skeleton/internal/model"
@@ -29,12 +28,16 @@ func NewHandler(service userService) *Handler {
 func (h *Handler) Signup(c echo.Context) error {
 	ctx := c.Request().Context()
 
-	email := c.FormValue("email")
-	username := c.FormValue("username")
-	log.Println(username)
-	password := c.FormValue("password")
+	var request SignUpUserReq
+	if err := c.Bind(&request); err != nil {
+		return c.JSON(http.StatusBadRequest, err.Error())
+	}
 
-	user, err := h.service.CreateUser(ctx, email, username, password)
+	if err := c.Validate(&request); err != nil {
+		return c.JSON(http.StatusBadRequest, err.Error())
+	}
+
+	user, err := h.service.CreateUser(ctx, request.Email, request.Username, request.Password)
 	if err != nil {
 		return c.JSON(http.StatusNotFound, err.Error())
 	}
@@ -45,12 +48,16 @@ func (h *Handler) Signup(c echo.Context) error {
 func (h *Handler) SignUpAdmin(c echo.Context) error {
 	ctx := c.Request().Context()
 
-	email := c.FormValue("email")
-	username := c.FormValue("username")
-	log.Println(username)
-	password := c.FormValue("password")
+	var request SignUpUserReq
+	if err := c.Bind(&request); err != nil {
+		return c.JSON(http.StatusBadRequest, err.Error())
+	}
 
-	user, err := h.service.CreateAdmin(ctx, email, username, password)
+	if err := c.Validate(&request); err != nil {
+		return c.JSON(http.StatusBadRequest, err.Error())
+	}
+
+	user, err := h.service.CreateAdmin(ctx, request.Email, request.Username, request.Password)
 	if err != nil {
 		return c.JSON(http.StatusNotFound, err.Error())
 	}
@@ -61,12 +68,16 @@ func (h *Handler) SignUpAdmin(c echo.Context) error {
 func (h *Handler) GetUser(c echo.Context) error {
 	ctx := c.Request().Context()
 
-	var param GetUserReq
-	if err := c.Bind(&param); err != nil {
+	var request GetUserReq
+	if err := c.Bind(&request); err != nil {
 		return c.JSON(http.StatusBadRequest, err.Error())
 	}
 
-	user, err := h.service.GetUser(ctx, int64(param.ID))
+	if err := c.Validate(&request); err != nil {
+		return c.JSON(http.StatusBadRequest, err.Error())
+	}
+
+	user, err := h.service.GetUser(ctx, int64(request.ID))
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, err.Error())
 	}
@@ -82,6 +93,10 @@ func (h *Handler) GetUsersByRole(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, err.Error())
 	}
 
+	if err := c.Validate(&param); err != nil {
+		return c.JSON(http.StatusBadRequest, err.Error())
+	}
+
 	users, err := h.service.GetUsersByRole(ctx, model.Roles(param.Role), int32(param.Limit), int32(param.Offset))
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, err.Error())
@@ -93,12 +108,16 @@ func (h *Handler) GetUsersByRole(c echo.Context) error {
 func (h *Handler) GetUsersLikeUsername(c echo.Context) error {
 	ctx := c.Request().Context()
 
-	var param GetUsersLikeUsernameReq
-	if err := c.Bind(&param); err != nil {
+	var request GetUsersLikeUsernameReq
+	if err := c.Bind(&request); err != nil {
 		return c.JSON(http.StatusBadRequest, err.Error())
 	}
 
-	users, err := h.service.GetUsersLikeUsername(ctx, param.Username, int32(param.Limit), int32(param.Offset))
+	if err := c.Validate(&request); err != nil {
+		return c.JSON(http.StatusBadRequest, err.Error())
+	}
+
+	users, err := h.service.GetUsersLikeUsername(ctx, request.Username, int32(request.Limit), int32(request.Offset))
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, err.Error())
 	}
@@ -109,12 +128,16 @@ func (h *Handler) GetUsersLikeUsername(c echo.Context) error {
 func (h *Handler) DeleteUser(c echo.Context) error {
 	ctx := c.Request().Context()
 
-	var param DeleteUserReq
-	if err := c.Bind(&param); err != nil {
+	var request DeleteUserReq
+	if err := c.Bind(&request); err != nil {
 		return c.JSON(http.StatusBadRequest, err.Error())
 	}
 
-	if err := h.service.DeleteUser(ctx, int64(param.ID)); err != nil {
+	if err := c.Validate(&request); err != nil {
+		return c.JSON(http.StatusBadRequest, err.Error())
+	}
+
+	if err := h.service.DeleteUser(ctx, int64(request.ID)); err != nil {
 		return c.JSON(http.StatusInternalServerError, err.Error())
 	}
 
