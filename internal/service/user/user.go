@@ -2,10 +2,14 @@ package user
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"log"
 
 	db "github.com/izzanzahrial/skeleton/db/sqlc"
 	"github.com/izzanzahrial/skeleton/internal/model"
 	pass "github.com/izzanzahrial/skeleton/pkg/password"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -31,6 +35,7 @@ func NewService(repo userRepo) *Service {
 func (s *Service) CreateUser(ctx context.Context, email, username, password string) (model.User, error) {
 	passHash, err := pass.Generate(password)
 	if err != nil {
+		log.Fatalf("failed to generate password hash: %v", err)
 		return model.User{}, err
 	}
 
@@ -44,6 +49,7 @@ func (s *Service) CreateUser(ctx context.Context, email, username, password stri
 
 	newUser, err := s.repo.CreateUser(ctx, user)
 	if err != nil {
+		log.Fatalf("failed to create user: %v", err)
 		return model.User{}, err
 	}
 
@@ -54,6 +60,7 @@ func (s *Service) CreateUser(ctx context.Context, email, username, password stri
 func (s *Service) CreateAdmin(ctx context.Context, email, username, password string) (model.User, error) {
 	passHash, err := pass.Generate(password)
 	if err != nil {
+		log.Fatalf("failed to generate password hash: %v", err)
 		return model.User{}, err
 	}
 
@@ -65,22 +72,32 @@ func (s *Service) CreateAdmin(ctx context.Context, email, username, password str
 		Origin:       db.OriginsNative,
 	}
 
-	newUser, err := s.repo.CreateUser(ctx, user)
+	newAdmin, err := s.repo.CreateUser(ctx, user)
 	if err != nil {
+		log.Fatalf("failed to create admin: %v", err)
 		return model.User{}, err
 	}
 
-	modelUser := model.DBUserToModelUser(newUser)[0]
+	modelUser := model.DBUserToModelUser(newAdmin)[0]
 	return modelUser, nil
 }
 
 func (s *Service) DeleteUser(ctx context.Context, id int64) error {
-	return s.repo.DeleteUser(ctx, id)
+	if err := s.repo.DeleteUser(ctx, id); err != nil {
+		log.Fatalf("failed to delete user: %v", err)
+		return err
+	}
+
+	return nil
 }
 
 func (s *Service) GetUser(ctx context.Context, id int64) (model.User, error) {
 	user, err := s.repo.GetUser(ctx, id)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return model.User{}, fmt.Errorf("user not found: %w", err)
+		}
+		log.Fatalf("failed to get user: %v", err)
 		return model.User{}, err
 	}
 
@@ -99,6 +116,10 @@ func (s *Service) GetUsersByRole(ctx context.Context, role model.Roles, limit, o
 
 	users, err := s.repo.GetUsersByRole(ctx, db.GetUsersByRoleParams{Role: db.Roles(role), LimitArg: newLimit, Offset: offset})
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("user not found: %w", err)
+		}
+		log.Fatalf("failed to get user role: %v", err)
 		return nil, err
 	}
 
@@ -118,6 +139,10 @@ func (s *Service) GetUsersLikeUsername(ctx context.Context, username string, lim
 
 	users, err := s.repo.GetUsersLikeUsername(ctx, db.GetUsersLikeUsernameParams{Username: pgtype.Text{String: wildcard, Valid: true}, LimitArg: newLimit, Offset: offset})
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("user not found: %w", err)
+		}
+		log.Fatalf("failed to get user like usersname: %v", err)
 		return nil, err
 	}
 

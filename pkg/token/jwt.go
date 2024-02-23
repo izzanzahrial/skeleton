@@ -1,7 +1,6 @@
 package token
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -28,7 +27,7 @@ func NewJWT(userID int64, role model.Roles) (string, error) {
 	// TODO: create secret keys for jwt
 	t, err := token.SignedString([]byte("secret"))
 	if err != nil {
-		return "", fmt.Errorf("failed to sign jwt token: %v", err)
+		return "", err
 	}
 
 	return t, nil

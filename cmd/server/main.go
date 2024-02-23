@@ -26,7 +26,7 @@ func main() {
 	ctx := context.Background()
 
 	if err := godotenv.Load(); err != nil {
-		panic("failed to load environment variables")
+		log.Panic("failed to load environment variables")
 	}
 
 	cfg, err := config.New()
@@ -43,6 +43,7 @@ func main() {
 
 	opt, err := redis.ParseURL(cfg.Cache.URL())
 	if err != nil {
+		log.Println(cfg.Cache.URL())
 		log.Panicf("failed to parse URL cache: %v", err)
 	}
 	rdb := redis.NewClient(opt)
@@ -74,6 +75,6 @@ func main() {
 
 	router.MapRoutes(server, handlers)
 	if err := server.Start(":" + cfg.Port); err != nil {
-		log.Fatalf("failed to start server: %s", err.Error())
+		log.Panicf("failed to start server: %s", err.Error())
 	}
 }

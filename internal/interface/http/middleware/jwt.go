@@ -1,7 +1,7 @@
 package middleware
 
 import (
-	"net/http"
+	"log"
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -18,11 +18,11 @@ func IsAuthorize(next echo.HandlerFunc) echo.HandlerFunc {
 		tkn := c.Get("user").(*jwt.Token)
 		claims, ok := tkn.Claims.(*token.JwtCustomClaims)
 		if !ok && !tkn.Valid {
-			return echo.NewHTTPError(http.StatusUnauthorized)
+			return echo.ErrUnauthorized
 		}
 
 		if claims.Role != model.RolesAdmin {
-			return echo.NewHTTPError(http.StatusUnauthorized)
+			return echo.ErrUnauthorized
 		}
 
 		return next(c)
@@ -34,7 +34,7 @@ func IsAuthorizeHeader(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		authtoken := c.Request().Header.Get("Authorization")
 		if authtoken == "" {
-			return echo.NewHTTPError(http.StatusUnauthorized)
+			return echo.ErrUnauthorized
 		}
 
 		tokenString := strings.Split(authtoken, " ")[1]
@@ -43,16 +43,17 @@ func IsAuthorizeHeader(next echo.HandlerFunc) echo.HandlerFunc {
 			return []byte("secret"), nil
 		})
 		if err != nil {
-			return echo.NewHTTPError(http.StatusUnauthorized, err)
+			log.Fatalf("failed to parse token: %v", err)
+			return echo.ErrUnauthorized
 		}
 
 		claims, ok := tkn.Claims.(*token.JwtCustomClaims)
 		if !ok && !tkn.Valid {
-			return echo.NewHTTPError(http.StatusUnauthorized)
+			return echo.ErrUnauthorized
 		}
 
 		if claims.Role != model.RolesAdmin {
-			return echo.NewHTTPError(http.StatusUnauthorized)
+			return echo.ErrUnauthorized
 		}
 
 		return next(c)

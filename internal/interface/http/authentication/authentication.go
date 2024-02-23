@@ -3,12 +3,15 @@ package authentication
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"log"
 	"net/http"
 	"os"
 
 	"github.com/izzanzahrial/skeleton/internal/interface/http/auth0"
 	"github.com/izzanzahrial/skeleton/internal/model"
 	"github.com/izzanzahrial/skeleton/pkg/token"
+	"github.com/jackc/pgx/v5"
 	"github.com/labstack/echo/v4"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -29,25 +32,29 @@ func NewHandler(service authService, auth0 *auth0.Authenticator) *Handler {
 }
 
 func (h *Handler) Login(c echo.Context) error {
-	ctx := c.Request().Context()
-
 	var request LoginReq
 	if err := c.Bind(&request); err != nil {
-		return c.JSON(http.StatusBadRequest, err.Error())
+		log.Fatalf("fail to bind: %v", err)
+		return echo.ErrBadRequest
 	}
 
 	if err := c.Validate(&request); err != nil {
-		return c.JSON(http.StatusBadRequest, err.Error())
+		log.Fatalf("fail to validate: %v", err)
+		return c.JSON(http.StatusBadRequest, err)
 	}
 
-	user, err := h.service.GetuserByEmailOrUsername(ctx, request.Email, request.Username, request.Password)
+	user, err := h.service.GetuserByEmailOrUsername(context.Background(), request.Email, request.Username, request.Password)
 	if err != nil {
-		return c.JSON(http.StatusNotFound, err.Error())
+		if errors.Is(err, pgx.ErrNoRows) {
+			return c.JSON(http.StatusNotFound, errors.New("user not found"))
+		}
+		return echo.ErrInternalServerError
 	}
 
 	tkn, err := token.NewJWT(user.ID, model.Roles(user.Role))
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, err.Error())
+		log.Fatalf("failed to create token: %v", err)
+		return echo.ErrInternalServerError
 	}
 
 	return c.JSON(http.StatusFound, echo.Map{"user": user, "token": tkn})
@@ -83,20 +90,23 @@ func (h *Handler) Callback(c echo.Context) error {
 	code := c.FormValue("code")
 	tkn, err := googleOauthConfig.Exchange(ctx, code)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadGateway, err)
+		log.Fatalf("failed to exchange google oauth token: %v", err)
+		return echo.ErrBadGateway
 	}
 
 	client := googleOauthConfig.Client(ctx, tkn)
 	response, err := client.Get(os.Getenv("GOOGLE_OAUTH_API_URL"))
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadGateway, err)
+		log.Fatalf("failed to get user data from google oauth api: %v", err)
+		return echo.ErrBadGateway
 	}
 	defer response.Body.Close()
 
 	var userInfo map[string]interface{}
 	err = json.NewDecoder(response.Body).Decode(&userInfo)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadGateway, err)
+		log.Fatalf("failed to decode response body: %v", err)
+		return echo.ErrInternalServerError
 	}
 
 	user := &model.User{
@@ -109,12 +119,13 @@ func (h *Handler) Callback(c echo.Context) error {
 
 	newUser, err := h.service.CreateOrCheckGoogleUser(ctx, *user)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadGateway, err)
+		return echo.ErrInternalServerError
 	}
 
 	jwtToken, err := token.NewJWT(newUser.ID, model.Roles(newUser.Role))
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadGateway, err)
+		log.Fatalf("failed to create token: %v", err)
+		return echo.ErrInternalServerError
 	}
 
 	// TODO: should be redirected to somewhere else
@@ -132,7 +143,8 @@ func (h *Handler) RefreshToken(c echo.Context) error {
 	newtoken := googleOauthConfig.TokenSource(context.Background(), &oauth2.Token{RefreshToken: refreshToken})
 	token, err := newtoken.Token()
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadGateway, err)
+		log.Fatalf("failed to refresh token: %v", err)
+		return echo.ErrBadGateway
 	}
 
 	// TODO: generate new jwt
@@ -147,22 +159,25 @@ func (h *Handler) LoginAuth0(c echo.Context) error {
 func (h *Handler) CallbackAuth0(c echo.Context) error {
 	// TODO: get the generated state
 	if c.QueryParam("state") != "temp" {
-		return c.JSON(http.StatusBadRequest, "invalid state parameter")
+		return echo.ErrBadGateway
 	}
 
 	token, err := h.auht0.Exchange(context.Background(), c.QueryParam("code"))
 	if err != nil {
-		return c.JSON(http.StatusUnauthorized, "failed to exchange an authorization code for a token")
+		log.Fatalf("failed to exchange token: %v", err)
+		return echo.ErrBadGateway
 	}
 
 	idToken, err := h.auht0.VerifyIDToken(context.Background(), token)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, "failed to verify the ID token")
+		log.Fatalf("failed to verify token: %v", err)
+		return echo.ErrBadGateway
 	}
 
 	var profile map[string]interface{}
 	if err := idToken.Claims(&profile); err != nil {
-		return c.JSON(http.StatusInternalServerError, err)
+		log.Fatalf("failed to unmarshal claims into profile: %v", err)
+		return echo.ErrBadGateway
 	}
 
 	// TODO: save the user from profile to database

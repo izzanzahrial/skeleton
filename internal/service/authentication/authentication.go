@@ -3,6 +3,7 @@ package authentication
 import (
 	"context"
 	"errors"
+	"log"
 
 	db "github.com/izzanzahrial/skeleton/db/sqlc"
 	"github.com/izzanzahrial/skeleton/internal/model"
@@ -10,6 +11,7 @@ import (
 	"github.com/izzanzahrial/skeleton/pkg/token"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type authRepo interface {
@@ -41,11 +43,17 @@ func (s *Service) GetuserByEmailOrUsername(ctx context.Context, email, username,
 
 	user, err := s.repo.GetuserByEmailOrUsername(ctx, param)
 	if err != nil {
+		if !errors.Is(err, pgx.ErrNoRows) {
+			log.Fatalf("Error getting user: %v", err)
+		}
 		return model.User{}, err
 	}
 
 	ok, err := pass.Check(password, user.PasswordHash)
 	if !ok || err != nil {
+		if !errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
+			log.Fatalf("Error checking password: %v", err)
+		}
 		return model.User{}, err
 	}
 
@@ -59,6 +67,7 @@ func (s *Service) CreateOrCheckGoogleUser(ctx context.Context, user model.User) 
 	}
 
 	if !errors.Is(err, pgx.ErrNoRows) {
+		log.Fatalf("error creating user: %v", err)
 		return model.User{}, err
 	}
 

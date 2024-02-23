@@ -3,6 +3,7 @@ package auth0
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -17,7 +18,7 @@ type Authenticator struct {
 func New() (*Authenticator, error) {
 	provier, err := oidc.NewProvider(context.Background(), "https://"+os.Getenv("AUTH0_DOMAIN")+"/")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create provider: %w", err)
 	}
 
 	conf := oauth2.Config{
