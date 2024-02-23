@@ -29,37 +29,37 @@ LIMIT 1;
 SELECT * FROM users
 WHERE role = $1 AND deleted_at IS NULL
 ORDER BY id DESC
-LIMIT COALESCE(sqlc.narg(limit_arg)::int, 10) 
+LIMIT COALESCE(sqlc.narg(limit_param)::int, 10) 
 OFFSET $2;
 
 -- name: GetUsersLikeUsername :many
 SELECT * FROM users
 WHERE username ILIKE $1
 ORDER BY id DESC
-LIMIT COALESCE(sqlc.narg(limit_arg)::int, 10) 
+LIMIT COALESCE(sqlc.narg(limit_param)::int, 10) 
 OFFSET $2;
 
 -- name: UpdateUserEmail :one
 UPDATE users
-SET email = $1
+SET email = $1, updated_at = NOW()
 WHERE id = $2 AND deleted_at IS NULL
 RETURNING *;
 
 -- name: UpdateUserPassword :one
 UPDATE users
-SET password_hash = $1
+SET password_hash = $1, updated_at = NOW()
 WHERE id = $2 AND deleted_at IS NULL
 RETURNING *;
 
 -- name: UpdateUserRole :one
 UPDATE users
-SET role = $1
+SET role = $1, updated_at = NOW()
 WHERE id = $2 AND deleted_at IS NULL
 RETURNING *;
 
 -- name: UpdateUserUsername :one
 UPDATE users
-SET username = $1
+SET username = $1, updated_at = NOW()
 WHERE id = $2 AND deleted_at IS NULL
 RETURNING *;
 
@@ -86,3 +86,21 @@ SELECT * FROM users
 WHERE (email = $1 OR $1 = '')
 AND deleted_at IS NULL
 LIMIT 1;
+
+-- name: GetPostsFullText :many
+SELECT * FROM posts
+WHERE (to_tsvector('simple', title) @@ plainto_tsquery('simple', sqlc.arg(title)::text) OR sqlc.arg(title)::text = '')
+AND (to_tsvector('simple', content) @@ plainto_tsquery('simple', sqlc.arg(content)::text) OR sqlc.arg(content)::text = '');
+
+-- name: CreatePost :one
+INSERT INTO posts (
+    user_id,
+    title,
+    content
+) VALUES (
+    $1, $2, $3
+) RETURNING *;
+
+-- name: GetPostByUserID :many
+SELECT * FROM posts 
+WHERE user_id = $1;

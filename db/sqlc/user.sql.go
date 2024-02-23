@@ -11,6 +11,37 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const createPost = `-- name: CreatePost :one
+INSERT INTO posts (
+    user_id,
+    title,
+    content
+) VALUES (
+    $1, $2, $3
+) RETURNING id, user_id, created_at, updated_at, deleted_at, title, content
+`
+
+type CreatePostParams struct {
+	UserID  int64  `json:"user_id"`
+	Title   string `json:"title"`
+	Content string `json:"content"`
+}
+
+func (q *Queries) CreatePost(ctx context.Context, arg CreatePostParams) (Post, error) {
+	row := q.db.QueryRow(ctx, createPost, arg.UserID, arg.Title, arg.Content)
+	var i Post
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+		&i.Title,
+		&i.Content,
+	)
+	return i, err
+}
+
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (
     email,
@@ -122,6 +153,78 @@ func (q *Queries) DeleteUser(ctx context.Context, id int64) error {
 	return err
 }
 
+const getPostByUserID = `-- name: GetPostByUserID :many
+SELECT id, user_id, created_at, updated_at, deleted_at, title, content FROM posts 
+WHERE user_id = $1
+`
+
+func (q *Queries) GetPostByUserID(ctx context.Context, userID int64) ([]Post, error) {
+	rows, err := q.db.Query(ctx, getPostByUserID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Post
+	for rows.Next() {
+		var i Post
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DeletedAt,
+			&i.Title,
+			&i.Content,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPostsFullText = `-- name: GetPostsFullText :many
+SELECT id, user_id, created_at, updated_at, deleted_at, title, content FROM posts
+WHERE (to_tsvector('simple', title) @@ plainto_tsquery('simple', $1::text) OR $1::text = '')
+AND (to_tsvector('simple', content) @@ plainto_tsquery('simple', $2::text) OR $2::text = '')
+`
+
+type GetPostsFullTextParams struct {
+	Title   string `json:"title"`
+	Content string `json:"content"`
+}
+
+func (q *Queries) GetPostsFullText(ctx context.Context, arg GetPostsFullTextParams) ([]Post, error) {
+	rows, err := q.db.Query(ctx, getPostsFullText, arg.Title, arg.Content)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Post
+	for rows.Next() {
+		var i Post
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DeletedAt,
+			&i.Title,
+			&i.Content,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getUser = `-- name: GetUser :one
 SELECT id, created_at, updated_at, deleted_at, email, username, password_hash, role, first_name, last_name, picture_url, refresh_token, origin FROM users 
 WHERE id = $1 LIMIT 1
@@ -184,13 +287,13 @@ OFFSET $2
 `
 
 type GetUsersByRoleParams struct {
-	Role     Roles       `json:"role"`
-	Offset   int32       `json:"offset"`
-	LimitArg pgtype.Int4 `json:"limit_arg"`
+	Role       Roles       `json:"role"`
+	Offset     int32       `json:"offset"`
+	LimitParam pgtype.Int4 `json:"limit_param"`
 }
 
 func (q *Queries) GetUsersByRole(ctx context.Context, arg GetUsersByRoleParams) ([]User, error) {
-	rows, err := q.db.Query(ctx, getUsersByRole, arg.Role, arg.Offset, arg.LimitArg)
+	rows, err := q.db.Query(ctx, getUsersByRole, arg.Role, arg.Offset, arg.LimitParam)
 	if err != nil {
 		return nil, err
 	}
@@ -232,13 +335,13 @@ OFFSET $2
 `
 
 type GetUsersLikeUsernameParams struct {
-	Username pgtype.Text `json:"username"`
-	Offset   int32       `json:"offset"`
-	LimitArg pgtype.Int4 `json:"limit_arg"`
+	Username   pgtype.Text `json:"username"`
+	Offset     int32       `json:"offset"`
+	LimitParam pgtype.Int4 `json:"limit_param"`
 }
 
 func (q *Queries) GetUsersLikeUsername(ctx context.Context, arg GetUsersLikeUsernameParams) ([]User, error) {
-	rows, err := q.db.Query(ctx, getUsersLikeUsername, arg.Username, arg.Offset, arg.LimitArg)
+	rows, err := q.db.Query(ctx, getUsersLikeUsername, arg.Username, arg.Offset, arg.LimitParam)
 	if err != nil {
 		return nil, err
 	}
@@ -335,7 +438,7 @@ func (q *Queries) GetuserByEmailOrUsername(ctx context.Context, arg GetuserByEma
 
 const updateUserEmail = `-- name: UpdateUserEmail :one
 UPDATE users
-SET email = $1
+SET email = $1, updated_at = NOW()
 WHERE id = $2 AND deleted_at IS NULL
 RETURNING id, created_at, updated_at, deleted_at, email, username, password_hash, role, first_name, last_name, picture_url, refresh_token, origin
 `
@@ -368,7 +471,7 @@ func (q *Queries) UpdateUserEmail(ctx context.Context, arg UpdateUserEmailParams
 
 const updateUserPassword = `-- name: UpdateUserPassword :one
 UPDATE users
-SET password_hash = $1
+SET password_hash = $1, updated_at = NOW()
 WHERE id = $2 AND deleted_at IS NULL
 RETURNING id, created_at, updated_at, deleted_at, email, username, password_hash, role, first_name, last_name, picture_url, refresh_token, origin
 `
@@ -401,7 +504,7 @@ func (q *Queries) UpdateUserPassword(ctx context.Context, arg UpdateUserPassword
 
 const updateUserRole = `-- name: UpdateUserRole :one
 UPDATE users
-SET role = $1
+SET role = $1, updated_at = NOW()
 WHERE id = $2 AND deleted_at IS NULL
 RETURNING id, created_at, updated_at, deleted_at, email, username, password_hash, role, first_name, last_name, picture_url, refresh_token, origin
 `
@@ -434,7 +537,7 @@ func (q *Queries) UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) 
 
 const updateUserUsername = `-- name: UpdateUserUsername :one
 UPDATE users
-SET username = $1
+SET username = $1, updated_at = NOW()
 WHERE id = $2 AND deleted_at IS NULL
 RETURNING id, created_at, updated_at, deleted_at, email, username, password_hash, role, first_name, last_name, picture_url, refresh_token, origin
 `

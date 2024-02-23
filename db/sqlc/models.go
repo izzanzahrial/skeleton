@@ -95,6 +95,16 @@ func (ns NullRoles) Value() (driver.Value, error) {
 	return string(ns.Roles), nil
 }
 
+type Post struct {
+	ID        int64              `json:"id"`
+	UserID    int64              `json:"user_id"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
+	Title     string             `json:"title"`
+	Content   string             `json:"content"`
+}
+
 type User struct {
 	ID           int64              `json:"id"`
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`

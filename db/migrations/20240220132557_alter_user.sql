@@ -16,5 +16,5 @@ ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;
 
 -- +goose Down
 -- +goose StatementBegin
-SELECT 'down SQL query';
+DROP TYPE IF EXISTS origins;
 -- +goose StatementEnd

@@ -13,5 +13,6 @@ CREATE INDEX trgm_idx_users_username ON users USING gin (username gin_trgm_ops);
 
 -- +goose Down
 -- +goose StatementBegin
-SELECT 'down SQL query';
+DROP EXTENSION IF EXISTS pg_trgm;
+DROP INDEX IF EXISTS trgm_idx_users_username;
 -- +goose StatementEnd

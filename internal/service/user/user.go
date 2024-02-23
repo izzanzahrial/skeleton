@@ -114,7 +114,7 @@ func (s *Service) GetUsersByRole(ctx context.Context, role model.Roles, limit, o
 		newLimit.Valid = true
 	}
 
-	users, err := s.repo.GetUsersByRole(ctx, db.GetUsersByRoleParams{Role: db.Roles(role), LimitArg: newLimit, Offset: offset})
+	users, err := s.repo.GetUsersByRole(ctx, db.GetUsersByRoleParams{Role: db.Roles(role), LimitParam: newLimit, Offset: offset})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, fmt.Errorf("user not found: %w", err)
@@ -137,7 +137,7 @@ func (s *Service) GetUsersLikeUsername(ctx context.Context, username string, lim
 		newLimit.Valid = true
 	}
 
-	users, err := s.repo.GetUsersLikeUsername(ctx, db.GetUsersLikeUsernameParams{Username: pgtype.Text{String: wildcard, Valid: true}, LimitArg: newLimit, Offset: offset})
+	users, err := s.repo.GetUsersLikeUsername(ctx, db.GetUsersLikeUsernameParams{Username: pgtype.Text{String: wildcard, Valid: true}, LimitParam: newLimit, Offset: offset})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, fmt.Errorf("user not found: %w", err)

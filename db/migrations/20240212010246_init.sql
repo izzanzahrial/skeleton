@@ -27,5 +27,7 @@ CREATE TABLE IF NOT EXISTS users (
 
 -- +goose Down
 -- +goose StatementBegin
-DROP TABLE IF EXISTS users CASCADE;
+DROP TABLE IF EXISTS users;
+DROP TYPE IF EXISTS roles;
+DROP EXTENSION IF EXISTS citext;
 -- +goose StatementEnd
