@@ -12,6 +12,7 @@ func MapRoutes(e *echo.Echo, h *handlers.Handlers) {
 
 	mapAuthenticationRoutes(v1, h)
 	mapUserRoutes(v1, h)
+	mapPostRoute(v1, h)
 }
 
 func mapAuthenticationRoutes(e *echo.Group, h *handlers.Handlers) {
@@ -35,4 +36,11 @@ func mapUserRoutes(e *echo.Group, h *handlers.Handlers) {
 	e.GET("/users/:role", h.User.GetUsersByRole, middleware.IsAuthenticated(), middleware.IsAuthorize)
 	e.GET("/users", h.User.GetUsersLikeUsername, middleware.IsAuthenticated(), middleware.IsAuthorize)
 	e.DELETE("/users", h.User.DeleteUser)
+}
+
+func mapPostRoute(e *echo.Group, h *handlers.Handlers) {
+	e.POST("/posts", h.Post.CreatePost)
+	e.GET("/posts", h.Post.GetPostByUserID)
+	// temporary url
+	e.GET("/posts/fulltext", h.Post.GetPostsFullText)
 }

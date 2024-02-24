@@ -11,37 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const createPost = `-- name: CreatePost :one
-INSERT INTO posts (
-    user_id,
-    title,
-    content
-) VALUES (
-    $1, $2, $3
-) RETURNING id, user_id, created_at, updated_at, deleted_at, title, content
-`
-
-type CreatePostParams struct {
-	UserID  int64  `json:"user_id"`
-	Title   string `json:"title"`
-	Content string `json:"content"`
-}
-
-func (q *Queries) CreatePost(ctx context.Context, arg CreatePostParams) (Post, error) {
-	row := q.db.QueryRow(ctx, createPost, arg.UserID, arg.Title, arg.Content)
-	var i Post
-	err := row.Scan(
-		&i.ID,
-		&i.UserID,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.DeletedAt,
-		&i.Title,
-		&i.Content,
-	)
-	return i, err
-}
-
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (
     email,
@@ -151,78 +120,6 @@ WHERE id = $1 AND deleted_at IS NULL
 func (q *Queries) DeleteUser(ctx context.Context, id int64) error {
 	_, err := q.db.Exec(ctx, deleteUser, id)
 	return err
-}
-
-const getPostByUserID = `-- name: GetPostByUserID :many
-SELECT id, user_id, created_at, updated_at, deleted_at, title, content FROM posts 
-WHERE user_id = $1
-`
-
-func (q *Queries) GetPostByUserID(ctx context.Context, userID int64) ([]Post, error) {
-	rows, err := q.db.Query(ctx, getPostByUserID, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Post
-	for rows.Next() {
-		var i Post
-		if err := rows.Scan(
-			&i.ID,
-			&i.UserID,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.DeletedAt,
-			&i.Title,
-			&i.Content,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getPostsFullText = `-- name: GetPostsFullText :many
-SELECT id, user_id, created_at, updated_at, deleted_at, title, content FROM posts
-WHERE (to_tsvector('simple', title) @@ plainto_tsquery('simple', $1::text) OR $1::text = '')
-AND (to_tsvector('simple', content) @@ plainto_tsquery('simple', $2::text) OR $2::text = '')
-`
-
-type GetPostsFullTextParams struct {
-	Title   string `json:"title"`
-	Content string `json:"content"`
-}
-
-func (q *Queries) GetPostsFullText(ctx context.Context, arg GetPostsFullTextParams) ([]Post, error) {
-	rows, err := q.db.Query(ctx, getPostsFullText, arg.Title, arg.Content)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Post
-	for rows.Next() {
-		var i Post
-		if err := rows.Scan(
-			&i.ID,
-			&i.UserID,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.DeletedAt,
-			&i.Title,
-			&i.Content,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const getUser = `-- name: GetUser :one

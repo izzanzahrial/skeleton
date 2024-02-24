@@ -2,12 +2,14 @@ package handlers
 
 import (
 	"github.com/izzanzahrial/skeleton/internal/interface/http/authentication"
+	"github.com/izzanzahrial/skeleton/internal/interface/http/post"
 	"github.com/izzanzahrial/skeleton/internal/interface/http/user"
 )
 
 type Handlers struct {
 	Auth *authentication.Handler
 	User *user.Handler
+	Post *post.Handler
 }
 
 // type HandlersConfiguration func(h *Handlers) error
@@ -31,9 +33,10 @@ type Handlers struct {
 // 	}
 // }
 
-func NewHandlers(ah *authentication.Handler, uh *user.Handler) *Handlers {
+func NewHandlers(ah *authentication.Handler, uh *user.Handler, ph *post.Handler) *Handlers {
 	return &Handlers{
 		Auth: ah,
 		User: uh,
+		Post: ph,
 	}
 }

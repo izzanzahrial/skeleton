@@ -10,9 +10,11 @@ import (
 	"github.com/izzanzahrial/skeleton/internal/interface/http/auth0"
 	authhandler "github.com/izzanzahrial/skeleton/internal/interface/http/authentication"
 	"github.com/izzanzahrial/skeleton/internal/interface/http/handlers"
+	posthandler "github.com/izzanzahrial/skeleton/internal/interface/http/post"
 	"github.com/izzanzahrial/skeleton/internal/interface/http/router"
 	userhandler "github.com/izzanzahrial/skeleton/internal/interface/http/user"
 	"github.com/izzanzahrial/skeleton/internal/service/authentication"
+	"github.com/izzanzahrial/skeleton/internal/service/post"
 	"github.com/izzanzahrial/skeleton/internal/service/user"
 	pkgvalidator "github.com/izzanzahrial/skeleton/pkg/validator"
 	"github.com/jackc/pgx/v5"
@@ -62,7 +64,10 @@ func main() {
 	userService := user.NewService(db)
 	userHandler := userhandler.NewHandler(userService)
 
-	handlers := handlers.NewHandlers(authHandler, userHandler)
+	postService := post.NewService(db)
+	postHandler := posthandler.NewHandler(postService)
+
+	handlers := handlers.NewHandlers(authHandler, userHandler, postHandler)
 
 	cv, err := pkgvalidator.New()
 	if err != nil {
