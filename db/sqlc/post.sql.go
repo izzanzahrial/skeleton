@@ -77,26 +77,20 @@ func (q *Queries) GetPostByUserID(ctx context.Context, userID int64) ([]Post, er
 
 const getPostsFullText = `-- name: GetPostsFullText :many
 SELECT id, user_id, created_at, updated_at, deleted_at, title, content FROM posts
-WHERE (to_tsvector('simple', title) @@ plainto_tsquery('simple', $2::text) OR $2::text = '')
-AND (to_tsvector('simple', content) @@ plainto_tsquery('simple', $3::text) OR $3::text = '')
-LIMIT COALESCE($4::int, 10) 
+WHERE (to_tsvector('simple', title) @@ plainto_tsquery('simple', $2::text) OR title = '')
+OR (to_tsvector('simple', content) @@ plainto_tsquery('simple', $2::text) OR content = '')
+LIMIT COALESCE($3::int, 10) 
 OFFSET $1
 `
 
 type GetPostsFullTextParams struct {
 	Offset     int32       `json:"offset"`
-	Title      string      `json:"title"`
-	Content    string      `json:"content"`
+	Keyword    string      `json:"keyword"`
 	LimitParam pgtype.Int4 `json:"limit_param"`
 }
 
 func (q *Queries) GetPostsFullText(ctx context.Context, arg GetPostsFullTextParams) ([]Post, error) {
-	rows, err := q.db.Query(ctx, getPostsFullText,
-		arg.Offset,
-		arg.Title,
-		arg.Content,
-		arg.LimitParam,
-	)
+	rows, err := q.db.Query(ctx, getPostsFullText, arg.Offset, arg.Keyword, arg.LimitParam)
 	if err != nil {
 		return nil, err
 	}

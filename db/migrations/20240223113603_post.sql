@@ -1,10 +1,5 @@
 -- +goose Up
 -- +goose StatementBegin
-
--- Index
-CREATE INDEX IF NOT EXISTS posts_title_idx ON posts USING GIN (to_tsvector('simple', title));
-CREATE INDEX IF NOT EXISTS posts_content_idx ON posts USING GIN (to_tsvector('simple', contet));
-
 CREATE TABLE IF NOT EXISTS posts (
     id bigserial PRIMARY KEY,
     user_id bigint NOT NULL,
@@ -18,6 +13,11 @@ CREATE TABLE IF NOT EXISTS posts (
             REFERENCES users (id)
             ON DELETE SET NULL
 );
+
+-- Index
+CREATE INDEX IF NOT EXISTS posts_title_idx ON posts USING GIN (to_tsvector('simple', title));
+CREATE INDEX IF NOT EXISTS posts_content_idx ON posts USING GIN (to_tsvector('simple', content));
+
 -- +goose StatementEnd
 
 -- +goose Down

@@ -14,7 +14,7 @@ import (
 type postService interface {
 	CreatePost(ctx context.Context, userID int64, title, content string) (model.Post, error)
 	GetPostByUserID(ctx context.Context, userID int64) ([]model.Post, error)
-	GetPostsFullText(ctx context.Context, limit, offset int, title, content string) ([]model.Post, error)
+	GetPostsFullText(ctx context.Context, limit, offset int, keyword string) ([]model.Post, error)
 }
 
 type Handler struct {
@@ -80,7 +80,7 @@ func (h *Handler) GetPostsFullText(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, err.Error())
 	}
 
-	posts, err := h.service.GetPostsFullText(context.Background(), request.Limit, request.Offset, request.Title, request.Content)
+	posts, err := h.service.GetPostsFullText(context.Background(), request.Limit, request.Offset, request.Keyword)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return echo.ErrNotFound

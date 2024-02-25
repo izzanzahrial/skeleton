@@ -57,7 +57,7 @@ func (s *Service) GetPostByUserID(ctx context.Context, userID int64) ([]model.Po
 	return modelPost, nil
 }
 
-func (s *Service) GetPostsFullText(ctx context.Context, limit, offset int, title, content string) ([]model.Post, error) {
+func (s *Service) GetPostsFullText(ctx context.Context, limit, offset int, keyword string) ([]model.Post, error) {
 	var newLimit pgtype.Int4
 	if limit <= 0 {
 		newLimit.Valid = false
@@ -68,15 +68,14 @@ func (s *Service) GetPostsFullText(ctx context.Context, limit, offset int, title
 
 	param := db.GetPostsFullTextParams{
 		Offset:     int32(offset),
-		Title:      title,
-		Content:    content,
+		Keyword:    keyword,
 		LimitParam: newLimit,
 	}
 
 	posts, err := s.repo.GetPostsFullText(ctx, param)
 	if err != nil {
 		if !errors.Is(err, pgx.ErrNoRows) {
-			log.Fatalf("failed to get post by title: %v and content: %v error: %v", title, content, err)
+			log.Fatalf("failed to get post with keyword: %v error: %v", keyword, err)
 		}
 		return nil, err
 	}

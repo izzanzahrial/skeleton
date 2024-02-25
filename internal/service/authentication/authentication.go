@@ -28,12 +28,38 @@ type Service struct {
 	cache authCache
 }
 
+type ServiceConfig func(s *Service) error
+
 func NewService(repo authRepo, cache authCache) *Service {
 	return &Service{
 		repo:  repo,
 		cache: cache,
 	}
 }
+
+// Optional factory pattern
+// type ServiceConfig func(s *Service) error
+
+// func NewService(repo authRepo, cfgs ...ServiceConfig) (*Service, error) {
+// 	s := &Service{
+// 		repo: repo,
+// 	}
+
+// 	for _, cfg := range cfgs {
+// 		if err := cfg(s); err != nil {
+// 			return nil, err
+// 		}
+// 	}
+
+// 	return s, nil
+// }
+
+// func WithRedisCache(c authCache) ServiceConfig {
+// 	return func(s *Service) error {
+// 		s.cache = c
+// 		return nil
+// 	}
+// }
 
 func (s *Service) GetuserByEmailOrUsername(ctx context.Context, email, username, password string) (model.User, error) {
 	param := db.GetuserByEmailOrUsernameParams{

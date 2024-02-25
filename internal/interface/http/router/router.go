@@ -40,7 +40,6 @@ func mapUserRoutes(e *echo.Group, h *handlers.Handlers) {
 
 func mapPostRoute(e *echo.Group, h *handlers.Handlers) {
 	e.POST("/posts", h.Post.CreatePost)
-	e.GET("/posts", h.Post.GetPostByUserID)
-	// temporary url
-	e.GET("/posts/fulltext", h.Post.GetPostsFullText)
+	e.GET("/posts/:id", h.Post.GetPostByUserID)
+	e.GET("/posts", h.Post.GetPostsFullText)
 }
