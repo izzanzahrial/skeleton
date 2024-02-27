@@ -2,10 +2,12 @@ package post
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log"
 
 	db "github.com/izzanzahrial/skeleton/db/sqlc"
+	"github.com/izzanzahrial/skeleton/internal/domain/post/broker"
 	"github.com/izzanzahrial/skeleton/internal/model"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -18,12 +20,14 @@ type postRepo interface {
 }
 
 type Service struct {
-	repo postRepo
+	repo     postRepo
+	producer *broker.Producer
 }
 
-func NewService(repo postRepo) *Service {
+func NewService(repo postRepo, producer *broker.Producer) *Service {
 	return &Service{
-		repo: repo,
+		repo:     repo,
+		producer: producer,
 	}
 }
 
@@ -41,6 +45,18 @@ func (s *Service) CreatePost(ctx context.Context, userID int64, title, content s
 	}
 
 	modelPost := model.DBPostToModelPost(post)[0]
+
+	msgPost, err := json.Marshal(modelPost)
+	if err != nil {
+		log.Fatalf("failed to marshal post: %v", err)
+		return model.Post{}, err
+	}
+
+	if err := s.producer.Publish(ctx, "posts", msgPost); err != nil {
+		log.Fatalf("failed to publish post: %v", err)
+		return modelPost, err
+	}
+
 	return modelPost, nil
 }
 
