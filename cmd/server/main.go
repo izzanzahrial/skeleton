@@ -3,10 +3,12 @@ package main
 import (
 	"context"
 	"log"
+	"os"
 
 	"github.com/izzanzahrial/skeleton/config"
 	db "github.com/izzanzahrial/skeleton/db/sqlc"
 	"github.com/izzanzahrial/skeleton/internal/domain/authentication/cache"
+	"github.com/izzanzahrial/skeleton/internal/domain/post/broker"
 	"github.com/izzanzahrial/skeleton/internal/interface/http/auth0"
 	authhandler "github.com/izzanzahrial/skeleton/internal/interface/http/authentication"
 	"github.com/izzanzahrial/skeleton/internal/interface/http/handlers"
@@ -25,27 +27,30 @@ import (
 )
 
 func main() {
-	ctx := context.Background()
-
 	if err := godotenv.Load(); err != nil {
 		log.Panic("failed to load environment variables")
 	}
 
-	cfg, err := config.New()
+	dbCfg, err := config.NewDatabase()
 	if err != nil {
-		log.Panicf("failed to create config: %v", err)
+		log.Panic("failed to initialize database configuration")
 	}
 
-	conn, err := pgx.Connect(ctx, cfg.Database.URL())
+	conn, err := pgx.Connect(context.Background(), dbCfg.URL())
 	if err != nil {
-		log.Println(cfg.Database.URL())
+		log.Println(dbCfg.URL())
 		log.Panicf("failed to connect to database: %v", err)
 	}
-	defer conn.Close(ctx)
+	defer conn.Close(context.Background())
 
-	opt, err := redis.ParseURL(cfg.Cache.URL())
+	redisCfg, err := config.NewCache()
 	if err != nil {
-		log.Println(cfg.Cache.URL())
+		log.Panic("failed to initialize cache configuration")
+	}
+
+	opt, err := redis.ParseURL(redisCfg.URL())
+	if err != nil {
+		log.Println(redisCfg.URL())
 		log.Panicf("failed to parse URL cache: %v", err)
 	}
 	rdb := redis.NewClient(opt)
@@ -58,13 +63,18 @@ func main() {
 		log.Panicf("failed to create auth0: %v", err)
 	}
 
+	producer, err := broker.NewProducer()
+	if err != nil {
+		log.Panicf("failed to create producer: %v", err)
+	}
+
 	authService := authentication.NewService(db, cache)
 	authHandler := authhandler.NewHandler(authService, auht0)
 
 	userService := user.NewService(db)
 	userHandler := userhandler.NewHandler(userService)
 
-	postService := post.NewService(db)
+	postService := post.NewService(db, producer)
 	postHandler := posthandler.NewHandler(postService)
 
 	handlers := handlers.NewHandlers(authHandler, userHandler, postHandler)
@@ -78,8 +88,13 @@ func main() {
 	server.Use(middleware.Logger())
 	server.Validator = cv
 
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
 	router.MapRoutes(server, handlers)
-	if err := server.Start(":" + cfg.Port); err != nil {
+	if err := server.Start(":" + port); err != nil {
 		log.Panicf("failed to start server: %s", err.Error())
 	}
 }
