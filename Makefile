@@ -26,6 +26,11 @@ exec-db: ## Exec into the postgres container
 	@echo 'Executing into postgres container...'
 	@docker exec -it skeleton_db psql -U skeleton -d skeletonDB
 
+## docker exec -it <container_name> /bin/bash
+exec-kafka: ## Exec into the kafka container
+	@echo 'Executing into kafka container...'
+	@docker exec -it skeleton_kafka /bin/bash
+
 compose-up: ## Run docker-compose
 	@echo 'Running docker-compose...'
 	@docker-compose up --build
