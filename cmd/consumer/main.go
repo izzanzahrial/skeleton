@@ -18,7 +18,6 @@ func main() {
 	if err != nil {
 		log.Panicf("failed to get kafka consumer config: %v", err)
 	}
-	log.Printf("%+v", cfg)
 
 	consumer, err := broker.NewConsumer()
 	if err != nil {
