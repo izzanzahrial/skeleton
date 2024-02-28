@@ -3,7 +3,7 @@ package post
 import (
 	"context"
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/izzanzahrial/skeleton/internal/model"
@@ -19,21 +19,22 @@ type postService interface {
 
 type Handler struct {
 	service postService
+	slog    *slog.Logger
 }
 
-func NewHandler(service postService) *Handler {
-	return &Handler{service: service}
+func NewHandler(service postService, slog *slog.Logger) *Handler {
+	return &Handler{service: service, slog: slog}
 }
 
 func (h *Handler) CreatePost(c echo.Context) error {
 	var request CreatPostReq
 	if err := c.Bind(&request); err != nil {
-		log.Fatalf("failed to bind request: %v", err)
+		h.slog.Error("failed to bind request", slog.String("error", err.Error()))
 		return echo.ErrBadRequest
 	}
 
 	if err := c.Validate(&request); err != nil {
-		log.Fatalf("failed to validate request: %v", err)
+		h.slog.Error("failed to validate request", slog.String("error", err.Error()))
 		return c.JSON(http.StatusBadRequest, err.Error())
 	}
 
@@ -48,12 +49,12 @@ func (h *Handler) CreatePost(c echo.Context) error {
 func (h *Handler) GetPostByUserID(c echo.Context) error {
 	var request GetPostByUserIDReq
 	if err := c.Bind(&request); err != nil {
-		log.Fatalf("failed to bind request: %v", err)
+		h.slog.Error("failed to bind request", slog.String("error", err.Error()))
 		return echo.ErrBadRequest
 	}
 
 	if err := c.Validate(&request); err != nil {
-		log.Fatalf("failed to validate request: %v", err)
+		h.slog.Error("failed to validate request", slog.String("error", err.Error()))
 		return c.JSON(http.StatusBadRequest, err.Error())
 	}
 
@@ -71,12 +72,12 @@ func (h *Handler) GetPostByUserID(c echo.Context) error {
 func (h *Handler) GetPostsFullText(c echo.Context) error {
 	var request GetPostsFullTextReq
 	if err := c.Bind(&request); err != nil {
-		log.Fatalf("failed to bind request: %v", err)
+		h.slog.Error("failed to bind request", slog.String("error", err.Error()))
 		return echo.ErrBadRequest
 	}
 
 	if err := c.Validate(&request); err != nil {
-		log.Fatalf("failed to validate request: %v", err)
+		h.slog.Error("failed to validate request", slog.String("error", err.Error()))
 		return c.JSON(http.StatusBadRequest, err.Error())
 	}
 

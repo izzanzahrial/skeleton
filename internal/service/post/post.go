@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"log"
+	"log/slog"
 
 	db "github.com/izzanzahrial/skeleton/db/sqlc"
 	"github.com/izzanzahrial/skeleton/internal/domain/post/broker"
@@ -22,12 +22,14 @@ type postRepo interface {
 type Service struct {
 	repo     postRepo
 	producer *broker.Producer
+	slog     *slog.Logger
 }
 
-func NewService(repo postRepo, producer *broker.Producer) *Service {
+func NewService(repo postRepo, producer *broker.Producer, slog *slog.Logger) *Service {
 	return &Service{
 		repo:     repo,
 		producer: producer,
+		slog:     slog,
 	}
 }
 
@@ -40,7 +42,7 @@ func (s *Service) CreatePost(ctx context.Context, userID int64, title, content s
 
 	post, err := s.repo.CreatePost(ctx, user)
 	if err != nil {
-		log.Fatalf("failed to create post: %v", err)
+		s.slog.Error("failed to create post", slog.String("error", err.Error()))
 		return model.Post{}, err
 	}
 
@@ -48,12 +50,12 @@ func (s *Service) CreatePost(ctx context.Context, userID int64, title, content s
 
 	msgPost, err := json.Marshal(modelPost)
 	if err != nil {
-		log.Fatalf("failed to marshal post: %v", err)
+		s.slog.Error("failed to marshal post", slog.String("error", err.Error()))
 		return model.Post{}, err
 	}
 
 	if err := s.producer.Publish(ctx, "posts", msgPost); err != nil {
-		log.Fatalf("failed to publish post: %v", err)
+		s.slog.Error("failed to publish post", slog.String("error", err.Error()))
 		return modelPost, err
 	}
 
@@ -64,7 +66,7 @@ func (s *Service) GetPostByUserID(ctx context.Context, userID int64) ([]model.Po
 	posts, err := s.repo.GetPostByUserID(ctx, userID)
 	if err != nil {
 		if !errors.Is(err, pgx.ErrNoRows) {
-			log.Fatalf("failed to get post by user id: %v", err)
+			s.slog.Error("failed to get post by used id", slog.String("error", err.Error()))
 		}
 		return nil, err
 	}
@@ -91,7 +93,7 @@ func (s *Service) GetPostsFullText(ctx context.Context, limit, offset int, keywo
 	posts, err := s.repo.GetPostsFullText(ctx, param)
 	if err != nil {
 		if !errors.Is(err, pgx.ErrNoRows) {
-			log.Fatalf("failed to get post with keyword: %v error: %v", keyword, err)
+			s.slog.Error("failed to get post with keyword", slog.String("error", err.Error()), slog.String("keyword", keyword))
 		}
 		return nil, err
 	}

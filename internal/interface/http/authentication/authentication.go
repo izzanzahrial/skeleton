@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 
@@ -25,21 +25,22 @@ type authService interface {
 type Handler struct {
 	service authService
 	auht0   *auth0.Authenticator
+	slog    *slog.Logger
 }
 
-func NewHandler(service authService, auth0 *auth0.Authenticator) *Handler {
-	return &Handler{service: service, auht0: auth0}
+func NewHandler(service authService, auth0 *auth0.Authenticator, slog *slog.Logger) *Handler {
+	return &Handler{service: service, auht0: auth0, slog: slog}
 }
 
 func (h *Handler) Login(c echo.Context) error {
 	var request LoginReq
 	if err := c.Bind(&request); err != nil {
-		log.Fatalf("fail to bind: %v", err)
+		h.slog.Error("fail to bind request", slog.String("error", err.Error()))
 		return echo.ErrBadRequest
 	}
 
 	if err := c.Validate(&request); err != nil {
-		log.Fatalf("fail to validate: %v", err)
+		h.slog.Error("fail to validate request", slog.String("error", err.Error()))
 		return c.JSON(http.StatusBadRequest, err)
 	}
 
@@ -53,7 +54,7 @@ func (h *Handler) Login(c echo.Context) error {
 
 	tkn, err := token.NewJWT(user.ID, model.Roles(user.Role))
 	if err != nil {
-		log.Fatalf("failed to create token: %v", err)
+		h.slog.Error("failed to create token", slog.String("error", err.Error()))
 		return echo.ErrInternalServerError
 	}
 
@@ -90,14 +91,14 @@ func (h *Handler) Callback(c echo.Context) error {
 	code := c.FormValue("code")
 	tkn, err := googleOauthConfig.Exchange(ctx, code)
 	if err != nil {
-		log.Fatalf("failed to exchange google oauth token: %v", err)
+		h.slog.Error("failed to exchange google oauth token", slog.String("error", err.Error()))
 		return echo.ErrBadGateway
 	}
 
 	client := googleOauthConfig.Client(ctx, tkn)
 	response, err := client.Get(os.Getenv("GOOGLE_OAUTH_API_URL"))
 	if err != nil {
-		log.Fatalf("failed to get user data from google oauth api: %v", err)
+		h.slog.Error("failed to get user data from google oauth api", slog.String("error", err.Error()))
 		return echo.ErrBadGateway
 	}
 	defer response.Body.Close()
@@ -105,7 +106,7 @@ func (h *Handler) Callback(c echo.Context) error {
 	var userInfo map[string]interface{}
 	err = json.NewDecoder(response.Body).Decode(&userInfo)
 	if err != nil {
-		log.Fatalf("failed to decode response body: %v", err)
+		h.slog.Error("failed to decode response body", slog.String("error", err.Error()))
 		return echo.ErrInternalServerError
 	}
 
@@ -124,7 +125,7 @@ func (h *Handler) Callback(c echo.Context) error {
 
 	jwtToken, err := token.NewJWT(newUser.ID, model.Roles(newUser.Role))
 	if err != nil {
-		log.Fatalf("failed to create token: %v", err)
+		h.slog.Error("failed to create token", slog.String("error", err.Error()))
 		return echo.ErrInternalServerError
 	}
 
@@ -143,7 +144,7 @@ func (h *Handler) RefreshToken(c echo.Context) error {
 	newtoken := googleOauthConfig.TokenSource(context.Background(), &oauth2.Token{RefreshToken: refreshToken})
 	token, err := newtoken.Token()
 	if err != nil {
-		log.Fatalf("failed to refresh token: %v", err)
+		h.slog.Error("failed to refresh token", slog.String("error", err.Error()))
 		return echo.ErrBadGateway
 	}
 
@@ -164,19 +165,19 @@ func (h *Handler) CallbackAuth0(c echo.Context) error {
 
 	token, err := h.auht0.Exchange(context.Background(), c.QueryParam("code"))
 	if err != nil {
-		log.Fatalf("failed to exchange token: %v", err)
+		h.slog.Error("failed to exchange token", slog.String("error", err.Error()))
 		return echo.ErrBadGateway
 	}
 
 	idToken, err := h.auht0.VerifyIDToken(context.Background(), token)
 	if err != nil {
-		log.Fatalf("failed to verify token: %v", err)
+		h.slog.Error("failed to verify token", slog.String("error", err.Error()))
 		return echo.ErrBadGateway
 	}
 
 	var profile map[string]interface{}
 	if err := idToken.Claims(&profile); err != nil {
-		log.Fatalf("failed to unmarshal claims into profile: %v", err)
+		h.slog.Error("failed to unmarshal claims into profile", slog.String("error", err.Error()))
 		return echo.ErrBadGateway
 	}
 

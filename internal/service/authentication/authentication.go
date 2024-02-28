@@ -3,7 +3,7 @@ package authentication
 import (
 	"context"
 	"errors"
-	"log"
+	"log/slog"
 
 	db "github.com/izzanzahrial/skeleton/db/sqlc"
 	"github.com/izzanzahrial/skeleton/internal/model"
@@ -26,14 +26,16 @@ type authCache interface {
 type Service struct {
 	repo  authRepo
 	cache authCache
+	slog  *slog.Logger
 }
 
 type ServiceConfig func(s *Service) error
 
-func NewService(repo authRepo, cache authCache) *Service {
+func NewService(repo authRepo, cache authCache, slog *slog.Logger) *Service {
 	return &Service{
 		repo:  repo,
 		cache: cache,
+		slog:  slog,
 	}
 }
 
@@ -70,7 +72,7 @@ func (s *Service) GetuserByEmailOrUsername(ctx context.Context, email, username,
 	user, err := s.repo.GetuserByEmailOrUsername(ctx, param)
 	if err != nil {
 		if !errors.Is(err, pgx.ErrNoRows) {
-			log.Fatalf("Error getting user: %v", err)
+			s.slog.Error("error getting user", slog.String("error", err.Error()))
 		}
 		return model.User{}, err
 	}
@@ -78,7 +80,7 @@ func (s *Service) GetuserByEmailOrUsername(ctx context.Context, email, username,
 	ok, err := pass.Check(password, user.PasswordHash)
 	if !ok || err != nil {
 		if !errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
-			log.Fatalf("Error checking password: %v", err)
+			s.slog.Error("error checking password", slog.String("error", err.Error()))
 		}
 		return model.User{}, err
 	}
@@ -93,7 +95,7 @@ func (s *Service) CreateOrCheckGoogleUser(ctx context.Context, user model.User) 
 	}
 
 	if !errors.Is(err, pgx.ErrNoRows) {
-		log.Fatalf("error creating user: %v", err)
+		s.slog.Error("error creating user", slog.String("error", err.Error()))
 		return model.User{}, err
 	}
 

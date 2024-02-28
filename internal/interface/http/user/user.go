@@ -3,7 +3,7 @@ package user
 import (
 	"context"
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/izzanzahrial/skeleton/internal/model"
@@ -22,21 +22,22 @@ type userService interface {
 
 type Handler struct {
 	service userService
+	slog    *slog.Logger
 }
 
-func NewHandler(service userService) *Handler {
-	return &Handler{service: service}
+func NewHandler(service userService, slog *slog.Logger) *Handler {
+	return &Handler{service: service, slog: slog}
 }
 
 func (h *Handler) Signup(c echo.Context) error {
 	var request SignUpUserReq
 	if err := c.Bind(&request); err != nil {
-		log.Fatalf("failed to bind request: %v", err)
+		h.slog.Error("failed to bind request", slog.String("error", err.Error()))
 		return echo.ErrBadRequest
 	}
 
 	if err := c.Validate(&request); err != nil {
-		log.Fatalf("failed to validate request: %v", err)
+		h.slog.Error("failed to validate request", slog.String("error", err.Error()))
 		return c.JSON(http.StatusBadRequest, err.Error())
 	}
 
@@ -51,12 +52,12 @@ func (h *Handler) Signup(c echo.Context) error {
 func (h *Handler) SignUpAdmin(c echo.Context) error {
 	var request SignUpUserReq
 	if err := c.Bind(&request); err != nil {
-		log.Fatalf("failed to bind request: %v", err)
+		h.slog.Error("failed to bind request", slog.String("error", err.Error()))
 		return echo.ErrBadRequest
 	}
 
 	if err := c.Validate(&request); err != nil {
-		log.Fatalf("failed to validate request: %v", err)
+		h.slog.Error("failed to validate request", slog.String("error", err.Error()))
 		return c.JSON(http.StatusBadRequest, err.Error())
 	}
 
@@ -71,12 +72,12 @@ func (h *Handler) SignUpAdmin(c echo.Context) error {
 func (h *Handler) GetUser(c echo.Context) error {
 	var request GetUserReq
 	if err := c.Bind(&request); err != nil {
-		log.Fatalf("failed to bind request: %v", err)
+		h.slog.Error("failed to bind request", slog.String("error", err.Error()))
 		return echo.ErrBadRequest
 	}
 
 	if err := c.Validate(&request); err != nil {
-		log.Fatalf("failed to validate request: %v", err)
+		h.slog.Error("failed to validate request", slog.String("error", err.Error()))
 		return c.JSON(http.StatusBadRequest, err.Error())
 	}
 
@@ -94,12 +95,12 @@ func (h *Handler) GetUser(c echo.Context) error {
 func (h *Handler) GetUsersByRole(c echo.Context) error {
 	var request GetUsersByRoleReq
 	if err := c.Bind(&request); err != nil {
-		log.Fatalf("failed to bind request: %v", err)
+		h.slog.Error("failed to bind request", slog.String("error", err.Error()))
 		return echo.ErrBadRequest
 	}
 
 	if err := c.Validate(&request); err != nil {
-		log.Fatalf("failed to validate request: %v", err)
+		h.slog.Error("failed to validate request", slog.String("error", err.Error()))
 		return c.JSON(http.StatusBadRequest, err.Error())
 	}
 
@@ -117,12 +118,12 @@ func (h *Handler) GetUsersByRole(c echo.Context) error {
 func (h *Handler) GetUsersLikeUsername(c echo.Context) error {
 	var request GetUsersLikeUsernameReq
 	if err := c.Bind(&request); err != nil {
-		log.Fatalf("failed to bind request: %v", err)
+		h.slog.Error("failed to bind request", slog.String("error", err.Error()))
 		return echo.ErrBadRequest
 	}
 
 	if err := c.Validate(&request); err != nil {
-		log.Fatalf("failed to validate request: %v", err)
+		h.slog.Error("failed to validate request", slog.String("error", err.Error()))
 		return c.JSON(http.StatusBadRequest, err.Error())
 	}
 
@@ -140,12 +141,12 @@ func (h *Handler) GetUsersLikeUsername(c echo.Context) error {
 func (h *Handler) DeleteUser(c echo.Context) error {
 	var request DeleteUserReq
 	if err := c.Bind(&request); err != nil {
-		log.Fatalf("failed to bind request: %v", err)
+		h.slog.Error("failed to bind request", slog.String("error", err.Error()))
 		return echo.ErrBadRequest
 	}
 
 	if err := c.Validate(&request); err != nil {
-		log.Fatalf("failed to validate request: %v", err)
+		h.slog.Error("failed to validate request", slog.String("error", err.Error()))
 		return c.JSON(http.StatusBadRequest, err.Error())
 	}
 

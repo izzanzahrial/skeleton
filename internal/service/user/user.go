@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 
 	db "github.com/izzanzahrial/skeleton/db/sqlc"
 	"github.com/izzanzahrial/skeleton/internal/model"
@@ -24,18 +24,20 @@ type userRepo interface {
 
 type Service struct {
 	repo userRepo
+	slog *slog.Logger
 }
 
-func NewService(repo userRepo) *Service {
+func NewService(repo userRepo, slog *slog.Logger) *Service {
 	return &Service{
 		repo: repo,
+		slog: slog,
 	}
 }
 
 func (s *Service) CreateUser(ctx context.Context, email, username, password string) (model.User, error) {
 	passHash, err := pass.Generate(password)
 	if err != nil {
-		log.Fatalf("failed to generate password hash: %v", err)
+		s.slog.Error("failed to generate password hash", slog.String("error", err.Error()))
 		return model.User{}, err
 	}
 
@@ -49,7 +51,7 @@ func (s *Service) CreateUser(ctx context.Context, email, username, password stri
 
 	newUser, err := s.repo.CreateUser(ctx, user)
 	if err != nil {
-		log.Fatalf("failed to create user: %v", err)
+		s.slog.Error("failed to create user", slog.String("error", err.Error()))
 		return model.User{}, err
 	}
 
@@ -60,7 +62,7 @@ func (s *Service) CreateUser(ctx context.Context, email, username, password stri
 func (s *Service) CreateAdmin(ctx context.Context, email, username, password string) (model.User, error) {
 	passHash, err := pass.Generate(password)
 	if err != nil {
-		log.Fatalf("failed to generate password hash: %v", err)
+		s.slog.Error("failed to generate password hash", slog.String("error", err.Error()))
 		return model.User{}, err
 	}
 
@@ -74,7 +76,7 @@ func (s *Service) CreateAdmin(ctx context.Context, email, username, password str
 
 	newAdmin, err := s.repo.CreateUser(ctx, user)
 	if err != nil {
-		log.Fatalf("failed to create admin: %v", err)
+		s.slog.Error("failed to create user", slog.String("error", err.Error()))
 		return model.User{}, err
 	}
 
@@ -84,7 +86,7 @@ func (s *Service) CreateAdmin(ctx context.Context, email, username, password str
 
 func (s *Service) DeleteUser(ctx context.Context, id int64) error {
 	if err := s.repo.DeleteUser(ctx, id); err != nil {
-		log.Fatalf("failed to delete user: %v", err)
+		s.slog.Error("failed to delete user", slog.String("error", err.Error()))
 		return err
 	}
 
@@ -97,7 +99,7 @@ func (s *Service) GetUser(ctx context.Context, id int64) (model.User, error) {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return model.User{}, fmt.Errorf("user not found: %w", err)
 		}
-		log.Fatalf("failed to get user: %v", err)
+		s.slog.Error("failed to get user", slog.String("error", err.Error()))
 		return model.User{}, err
 	}
 
@@ -119,7 +121,7 @@ func (s *Service) GetUsersByRole(ctx context.Context, role model.Roles, limit, o
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, fmt.Errorf("user not found: %w", err)
 		}
-		log.Fatalf("failed to get user role: %v", err)
+		s.slog.Error("failed to get users by role", slog.String("error", err.Error()))
 		return nil, err
 	}
 
@@ -142,7 +144,7 @@ func (s *Service) GetUsersLikeUsername(ctx context.Context, username string, lim
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, fmt.Errorf("user not found: %w", err)
 		}
-		log.Fatalf("failed to get user like usersname: %v", err)
+		s.slog.Error("failed to get users using like username", slog.String("error", err.Error()))
 		return nil, err
 	}
 

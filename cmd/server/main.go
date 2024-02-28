@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"log"
+	"log/slog"
 	"os"
+	"strings"
 
 	"github.com/izzanzahrial/skeleton/config"
 	db "github.com/izzanzahrial/skeleton/db/sqlc"
@@ -28,30 +30,60 @@ import (
 
 func main() {
 	if err := godotenv.Load(); err != nil {
-		log.Panic("failed to load environment variables")
+		panic("failed to load environment variables")
 	}
+
+	// TODO: move this somewhere else
+	level := os.Getenv("LOG_LEVEL")
+	if level == "" {
+		level = "info"
+	}
+
+	wd, err := os.Getwd()
+	if err != nil {
+		log.Fatal("unable to determine working directory")
+	}
+
+	replacer := func(groups []string, a slog.Attr) slog.Attr {
+		if a.Key == slog.SourceKey {
+			source := a.Value.Any().(*slog.Source)
+			if file, ok := strings.CutPrefix(source.File, wd); ok {
+				source.File = file
+			}
+		}
+		return a
+	}
+
+	options := &slog.HandlerOptions{
+		Level:       logLevel(level),
+		ReplaceAttr: replacer,
+	}
+	if level == "debug" {
+		options.AddSource = true
+	}
+
+	logger := slog.New(slog.NewJSONHandler(os.Stderr, options))
+	slog.SetDefault(logger)
 
 	dbCfg, err := config.NewDatabase()
 	if err != nil {
-		log.Panic("failed to initialize database configuration")
+		slog.Warn("failed to initialize database configuration")
 	}
 
 	conn, err := pgx.Connect(context.Background(), dbCfg.URL())
 	if err != nil {
-		log.Println(dbCfg.URL())
-		log.Panicf("failed to connect to database: %v", err)
+		slog.Warn("failed to connect to database", slog.String("url", dbCfg.URL()), slog.String("error", err.Error()))
 	}
 	defer conn.Close(context.Background())
 
 	redisCfg, err := config.NewCache()
 	if err != nil {
-		log.Panic("failed to initialize cache configuration")
+		slog.Warn("failed to initialize cache configuration")
 	}
 
 	opt, err := redis.ParseURL(redisCfg.URL())
 	if err != nil {
-		log.Println(redisCfg.URL())
-		log.Panicf("failed to parse URL cache: %v", err)
+		slog.Warn("failed to parse URL cache", slog.String("url", redisCfg.URL()), slog.String("error", err.Error()))
 	}
 	rdb := redis.NewClient(opt)
 
@@ -60,28 +92,28 @@ func main() {
 
 	auht0, err := auth0.New()
 	if err != nil {
-		log.Panicf("failed to create auth0: %v", err)
+		slog.Warn("failed to create auth0", slog.String("error", err.Error()))
 	}
 
 	producer, err := broker.NewProducer()
 	if err != nil {
-		log.Panicf("failed to create producer: %v", err)
+		slog.Warn("failed to create producer", slog.String("error", err.Error()))
 	}
 
-	authService := authentication.NewService(db, cache)
-	authHandler := authhandler.NewHandler(authService, auht0)
+	authService := authentication.NewService(db, cache, logger)
+	authHandler := authhandler.NewHandler(authService, auht0, logger)
 
-	userService := user.NewService(db)
-	userHandler := userhandler.NewHandler(userService)
+	userService := user.NewService(db, logger)
+	userHandler := userhandler.NewHandler(userService, logger)
 
-	postService := post.NewService(db, producer)
-	postHandler := posthandler.NewHandler(postService)
+	postService := post.NewService(db, producer, logger)
+	postHandler := posthandler.NewHandler(postService, logger)
 
 	handlers := handlers.NewHandlers(authHandler, userHandler, postHandler)
 
 	cv, err := pkgvalidator.New()
 	if err != nil {
-		log.Panic(err)
+		slog.Warn("failed to create validator", slog.String("error", err.Error()))
 	}
 
 	server := echo.New()
@@ -95,6 +127,21 @@ func main() {
 
 	router.MapRoutes(server, handlers)
 	if err := server.Start(":" + port); err != nil {
-		log.Panicf("failed to start server: %s", err.Error())
+		slog.Warn("failed to start server", slog.String("error", err.Error()))
+	}
+}
+
+func logLevel(level string) slog.Level {
+	switch level {
+	case "debug":
+		return slog.LevelDebug
+	case "info":
+		return slog.LevelInfo
+	case "warn":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
 	}
 }
