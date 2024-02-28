@@ -17,6 +17,7 @@ type userService interface {
 	GetUser(ctx context.Context, id int64) (model.User, error)
 	GetUsersByRole(ctx context.Context, role model.Roles, limit, offset int32) ([]model.User, error)
 	GetUsersLikeUsername(ctx context.Context, username string, limit, offset int32) ([]model.User, error)
+	UpdateUser(ctx context.Context, id int64, email, username, password *string) (model.User, error)
 	DeleteUser(ctx context.Context, id int64) error
 }
 
@@ -155,4 +156,24 @@ func (h *Handler) DeleteUser(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, nil)
+}
+
+func (h *Handler) UpdateUser(c echo.Context) error {
+	var request UpdateUserReq
+	if err := c.Bind(&request); err != nil {
+		h.slog.Error("failed to bind request", slog.String("error", err.Error()))
+		return echo.ErrBadRequest
+	}
+
+	if err := c.Validate(&request); err != nil {
+		h.slog.Error("failed to validate request", slog.String("error", err.Error()))
+		return c.JSON(http.StatusBadRequest, err.Error())
+	}
+
+	user, err := h.service.UpdateUser(context.Background(), int64(request.ID), request.Email, request.Username, request.Password)
+	if err != nil {
+		return echo.ErrInternalServerError
+	}
+
+	return c.JSON(http.StatusCreated, user)
 }

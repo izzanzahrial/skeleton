@@ -39,12 +39,6 @@ ORDER BY id DESC
 LIMIT COALESCE(sqlc.narg(limit_param)::int, 10) 
 OFFSET $2;
 
--- name: UpdateUserEmail :one
-UPDATE users
-SET email = $1, updated_at = NOW()
-WHERE id = $2 AND deleted_at IS NULL
-RETURNING *;
-
 -- name: UpdateUserPassword :one
 UPDATE users
 SET password_hash = $1, updated_at = NOW()
@@ -57,10 +51,10 @@ SET role = $1, updated_at = NOW()
 WHERE id = $2 AND deleted_at IS NULL
 RETURNING *;
 
--- name: UpdateUserUsername :one
+-- name: UpdateUser :one
 UPDATE users
-SET username = $1, updated_at = NOW()
-WHERE id = $2 AND deleted_at IS NULL
+SET updated_at = NOW(), email = $1, username = $2, password_hash = $3
+WHERE id = $4 AND deleted_at IS NULL
 RETURNING *;
 
 -- name: DeleteUser :exec

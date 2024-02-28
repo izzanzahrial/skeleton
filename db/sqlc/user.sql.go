@@ -333,20 +333,27 @@ func (q *Queries) GetuserByEmailOrUsername(ctx context.Context, arg GetuserByEma
 	return i, err
 }
 
-const updateUserEmail = `-- name: UpdateUserEmail :one
+const updateUser = `-- name: UpdateUser :one
 UPDATE users
-SET email = $1, updated_at = NOW()
-WHERE id = $2 AND deleted_at IS NULL
+SET updated_at = NOW(), email = $1, username = $2, password_hash = $3
+WHERE id = $4 AND deleted_at IS NULL
 RETURNING id, created_at, updated_at, deleted_at, email, username, password_hash, role, first_name, last_name, picture_url, refresh_token, origin
 `
 
-type UpdateUserEmailParams struct {
-	Email string `json:"email"`
-	ID    int64  `json:"id"`
+type UpdateUserParams struct {
+	Email        string      `json:"email"`
+	Username     pgtype.Text `json:"username"`
+	PasswordHash []byte      `json:"password_hash"`
+	ID           int64       `json:"id"`
 }
 
-func (q *Queries) UpdateUserEmail(ctx context.Context, arg UpdateUserEmailParams) (User, error) {
-	row := q.db.QueryRow(ctx, updateUserEmail, arg.Email, arg.ID)
+func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error) {
+	row := q.db.QueryRow(ctx, updateUser,
+		arg.Email,
+		arg.Username,
+		arg.PasswordHash,
+		arg.ID,
+	)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -413,39 +420,6 @@ type UpdateUserRoleParams struct {
 
 func (q *Queries) UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) (User, error) {
 	row := q.db.QueryRow(ctx, updateUserRole, arg.Role, arg.ID)
-	var i User
-	err := row.Scan(
-		&i.ID,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.DeletedAt,
-		&i.Email,
-		&i.Username,
-		&i.PasswordHash,
-		&i.Role,
-		&i.FirstName,
-		&i.LastName,
-		&i.PictureUrl,
-		&i.RefreshToken,
-		&i.Origin,
-	)
-	return i, err
-}
-
-const updateUserUsername = `-- name: UpdateUserUsername :one
-UPDATE users
-SET username = $1, updated_at = NOW()
-WHERE id = $2 AND deleted_at IS NULL
-RETURNING id, created_at, updated_at, deleted_at, email, username, password_hash, role, first_name, last_name, picture_url, refresh_token, origin
-`
-
-type UpdateUserUsernameParams struct {
-	Username pgtype.Text `json:"username"`
-	ID       int64       `json:"id"`
-}
-
-func (q *Queries) UpdateUserUsername(ctx context.Context, arg UpdateUserUsernameParams) (User, error) {
-	row := q.db.QueryRow(ctx, updateUserUsername, arg.Username, arg.ID)
 	var i User
 	err := row.Scan(
 		&i.ID,

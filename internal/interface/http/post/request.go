@@ -12,6 +12,6 @@ type GetPostByUserIDReq struct {
 
 type GetPostsFullTextReq struct {
 	Keyword string `query:"keyword" json:"keyword"`
-	Limit   int    `query:"limit" json:"limit"`
-	Offset  int    `query:"offset" json:"offset"`
+	Limit   int    `query:"limit" json:"limit" validate:"omitempty,gte=10"`
+	Offset  int    `query:"offset" json:"offset" validate:"omitempty,gte=1"`
 }

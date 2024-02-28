@@ -19,6 +19,7 @@ type userRepo interface {
 	GetUsersByRole(ctx context.Context, arg db.GetUsersByRoleParams) ([]db.User, error)
 	GetUsersLikeUsername(ctx context.Context, arg db.GetUsersLikeUsernameParams) ([]db.User, error)
 	GetuserByEmailOrUsername(ctx context.Context, arg db.GetuserByEmailOrUsernameParams) (db.User, error)
+	UpdateUser(ctx context.Context, arg db.UpdateUserParams) (db.User, error)
 	DeleteUser(ctx context.Context, id int64) error
 }
 
@@ -158,4 +159,38 @@ func (s *Service) GetuserByEmailOrUsername(ctx context.Context, email, username 
 	}
 
 	return model.DBUserToModelUser(user)[0], nil
+}
+
+func (s *Service) UpdateUser(ctx context.Context, id int64, email, username, password *string) (model.User, error) {
+	user, err := s.repo.GetUser(ctx, id)
+	if err != nil {
+		if !errors.Is(err, pgx.ErrNoRows) {
+			s.slog.Error("failed to get user", slog.String("error", err.Error()))
+			return model.User{}, fmt.Errorf("user not found: %w", err)
+		}
+		return model.User{}, err
+	}
+
+	if email != nil {
+		user.Email = *email
+	}
+	if username != nil {
+		user.Username = pgtype.Text{String: *username, Valid: true}
+	}
+	if password != nil {
+		passHash, err := pass.Generate(*password)
+		if err != nil {
+			s.slog.Error("failed to generate password hash", slog.String("error", err.Error()))
+			return model.User{}, err
+		}
+		user.PasswordHash = passHash
+	}
+
+	updatedUser, err := s.repo.UpdateUser(ctx, db.UpdateUserParams{Email: user.Email, Username: user.Username, PasswordHash: user.PasswordHash, ID: id})
+	if err != nil {
+		s.slog.Error("failed to update user", slog.String("error", err.Error()))
+		return model.User{}, err
+	}
+
+	return model.DBUserToModelUser(updatedUser)[0], nil
 }
