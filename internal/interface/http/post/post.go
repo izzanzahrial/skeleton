@@ -9,7 +9,10 @@ import (
 	"github.com/izzanzahrial/skeleton/internal/model"
 	"github.com/jackc/pgx/v5"
 	"github.com/labstack/echo/v4"
+	"go.opentelemetry.io/otel"
 )
+
+var tracer = otel.Tracer("github.com/izzanzahrial/skeleton/internal/interface/http/post")
 
 type postService interface {
 	CreatePost(ctx context.Context, userID int64, title, content string) (model.Post, error)
@@ -27,6 +30,10 @@ func NewHandler(service postService, slog *slog.Logger) *Handler {
 }
 
 func (h *Handler) CreatePost(c echo.Context) error {
+	ctx := c.Request().Context()
+	ctx, span := tracer.Start(ctx, "post.CreatePost")
+	defer span.End()
+
 	var request CreatPostReq
 	if err := c.Bind(&request); err != nil {
 		h.slog.Error("failed to bind request", slog.String("error", err.Error()))
@@ -38,7 +45,7 @@ func (h *Handler) CreatePost(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, err.Error())
 	}
 
-	post, err := h.service.CreatePost(context.Background(), request.UserID, request.Title, request.Content)
+	post, err := h.service.CreatePost(ctx, request.UserID, request.Title, request.Content)
 	if err != nil {
 		return echo.ErrInternalServerError
 	}
@@ -47,6 +54,10 @@ func (h *Handler) CreatePost(c echo.Context) error {
 }
 
 func (h *Handler) GetPostByUserID(c echo.Context) error {
+	ctx := c.Request().Context()
+	ctx, span := tracer.Start(ctx, "post.GetPostByUserID")
+	defer span.End()
+
 	var request GetPostByUserIDReq
 	if err := c.Bind(&request); err != nil {
 		h.slog.Error("failed to bind request", slog.String("error", err.Error()))
@@ -58,7 +69,7 @@ func (h *Handler) GetPostByUserID(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, err.Error())
 	}
 
-	posts, err := h.service.GetPostByUserID(context.Background(), request.UserID)
+	posts, err := h.service.GetPostByUserID(ctx, request.UserID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return echo.ErrNotFound
@@ -70,6 +81,10 @@ func (h *Handler) GetPostByUserID(c echo.Context) error {
 }
 
 func (h *Handler) GetPostsFullText(c echo.Context) error {
+	ctx := c.Request().Context()
+	ctx, span := tracer.Start(ctx, "post.GetPostsFullText")
+	defer span.End()
+
 	var request GetPostsFullTextReq
 	if err := c.Bind(&request); err != nil {
 		h.slog.Error("failed to bind request", slog.String("error", err.Error()))
@@ -81,7 +96,7 @@ func (h *Handler) GetPostsFullText(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, err.Error())
 	}
 
-	posts, err := h.service.GetPostsFullText(context.Background(), request.Limit, request.Offset, request.Keyword)
+	posts, err := h.service.GetPostsFullText(ctx, request.Limit, request.Offset, request.Keyword)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return echo.ErrNotFound

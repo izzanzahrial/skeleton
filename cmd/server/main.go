@@ -26,12 +26,35 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/redis/go-redis/v9"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/sdk/resource"
+	"go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 )
 
 func main() {
 	if err := godotenv.Load(); err != nil {
-		panic("failed to load environment variables")
+		log.Fatalf("failed to load environment variables: %v", err)
 	}
+
+	exp, err := newOTLPExporter(context.Background())
+	if err != nil {
+		log.Fatalf("failed to initialize exporter: %v", err)
+	}
+
+	// Create a new tracer provider with a batch span processor and the given exporter.
+	tp := newTraceProvider(exp)
+	defer func() {
+		if err := tp.Shutdown(context.Background()); err != nil {
+			log.Printf("Error shutting down tracer provider: %v", err)
+		}
+	}()
+	otel.SetTracerProvider(tp)
+	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
 
 	// TODO: move this somewhere else
 	level := os.Getenv("LOG_LEVEL")
@@ -144,4 +167,49 @@ func logLevel(level string) slog.Level {
 	default:
 		return slog.LevelInfo
 	}
+}
+
+// List of supported exporters
+// https://opentelemetry.io/docs/instrumentation/go/exporters/
+
+// Console Exporter, only for testing
+func newConsoleExporter() (trace.SpanExporter, error) {
+	return stdouttrace.New(stdouttrace.WithPrettyPrint())
+}
+
+// OTLP Exporter
+func newOTLPExporter(ctx context.Context) (trace.SpanExporter, error) {
+	// Change default HTTPS -> HTTP
+	insecureOpt := otlptracehttp.WithInsecure()
+
+	// Update default OTLP reciver endpoint
+	// TODO: create oltp endpoint for grafana
+	endpointOpt := otlptracehttp.WithEndpoint("")
+
+	return otlptracehttp.New(ctx, insecureOpt, endpointOpt)
+}
+
+// TracerProvider is an OpenTelemetry TracerProvider.
+// It provides Tracers to instrumentation so it can trace operational flow through a system.
+func newTraceProvider(exp trace.SpanExporter) *trace.TracerProvider {
+	// Ensure default SDK resources and the required service name are set.
+	r, err := resource.Merge(
+		resource.Default(),
+		resource.NewWithAttributes(
+			semconv.SchemaURL,
+			semconv.ServiceNameKey.String("skeleton"),
+			semconv.ServiceVersion("v0.1.0"),
+			attribute.String("environment", "demo"),
+		),
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	return trace.NewTracerProvider(
+		// the exporter that we use to send trace or metrics data to the collector
+		trace.WithBatcher(exp),
+		trace.WithResource(r),
+		// handle rate sampling, by 0.5 means only half of the time trace will be sent
+		trace.WithSampler(trace.TraceIDRatioBased(0.5)))
 }

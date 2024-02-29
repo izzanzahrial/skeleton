@@ -9,7 +9,10 @@ import (
 	"github.com/izzanzahrial/skeleton/internal/model"
 	"github.com/jackc/pgx/v5"
 	"github.com/labstack/echo/v4"
+	"go.opentelemetry.io/otel"
 )
+
+var tracer = otel.Tracer("github.com/izzanzahrial/skeleton/internal/interface/http/user")
 
 type userService interface {
 	CreateUser(ctx context.Context, email, username, password string) (model.User, error)
@@ -31,6 +34,10 @@ func NewHandler(service userService, slog *slog.Logger) *Handler {
 }
 
 func (h *Handler) Signup(c echo.Context) error {
+	ctx := c.Request().Context()
+	ctx, span := tracer.Start(ctx, "user.Signup")
+	defer span.End()
+
 	var request SignUpUserReq
 	if err := c.Bind(&request); err != nil {
 		h.slog.Error("failed to bind request", slog.String("error", err.Error()))
@@ -42,7 +49,7 @@ func (h *Handler) Signup(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, err.Error())
 	}
 
-	user, err := h.service.CreateUser(context.Background(), request.Email, request.Username, request.Password)
+	user, err := h.service.CreateUser(ctx, request.Email, request.Username, request.Password)
 	if err != nil {
 		return echo.ErrInternalServerError
 	}
@@ -51,6 +58,10 @@ func (h *Handler) Signup(c echo.Context) error {
 }
 
 func (h *Handler) SignUpAdmin(c echo.Context) error {
+	ctx := c.Request().Context()
+	ctx, span := tracer.Start(ctx, "user.SignUpAdmin")
+	defer span.End()
+
 	var request SignUpUserReq
 	if err := c.Bind(&request); err != nil {
 		h.slog.Error("failed to bind request", slog.String("error", err.Error()))
@@ -62,7 +73,7 @@ func (h *Handler) SignUpAdmin(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, err.Error())
 	}
 
-	user, err := h.service.CreateAdmin(context.Background(), request.Email, request.Username, request.Password)
+	user, err := h.service.CreateAdmin(ctx, request.Email, request.Username, request.Password)
 	if err != nil {
 		return echo.ErrInternalServerError
 	}
@@ -71,6 +82,10 @@ func (h *Handler) SignUpAdmin(c echo.Context) error {
 }
 
 func (h *Handler) GetUser(c echo.Context) error {
+	ctx := c.Request().Context()
+	ctx, span := tracer.Start(ctx, "user.GetUser")
+	defer span.End()
+
 	var request GetUserReq
 	if err := c.Bind(&request); err != nil {
 		h.slog.Error("failed to bind request", slog.String("error", err.Error()))
@@ -82,7 +97,7 @@ func (h *Handler) GetUser(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, err.Error())
 	}
 
-	user, err := h.service.GetUser(context.Background(), int64(request.ID))
+	user, err := h.service.GetUser(ctx, int64(request.ID))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return echo.ErrNotFound
@@ -94,6 +109,10 @@ func (h *Handler) GetUser(c echo.Context) error {
 }
 
 func (h *Handler) GetUsersByRole(c echo.Context) error {
+	ctx := c.Request().Context()
+	ctx, span := tracer.Start(ctx, "user.GetUsersByRole")
+	defer span.End()
+
 	var request GetUsersByRoleReq
 	if err := c.Bind(&request); err != nil {
 		h.slog.Error("failed to bind request", slog.String("error", err.Error()))
@@ -105,7 +124,7 @@ func (h *Handler) GetUsersByRole(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, err.Error())
 	}
 
-	users, err := h.service.GetUsersByRole(context.Background(), model.Roles(request.Role), int32(request.Limit), int32(request.Offset))
+	users, err := h.service.GetUsersByRole(ctx, model.Roles(request.Role), int32(request.Limit), int32(request.Offset))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return echo.ErrNotFound
@@ -117,6 +136,10 @@ func (h *Handler) GetUsersByRole(c echo.Context) error {
 }
 
 func (h *Handler) GetUsersLikeUsername(c echo.Context) error {
+	ctx := c.Request().Context()
+	ctx, span := tracer.Start(ctx, "user.GetUsersLikeUsername")
+	defer span.End()
+
 	var request GetUsersLikeUsernameReq
 	if err := c.Bind(&request); err != nil {
 		h.slog.Error("failed to bind request", slog.String("error", err.Error()))
@@ -128,7 +151,7 @@ func (h *Handler) GetUsersLikeUsername(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, err.Error())
 	}
 
-	users, err := h.service.GetUsersLikeUsername(context.Background(), request.Username, int32(request.Limit), int32(request.Offset))
+	users, err := h.service.GetUsersLikeUsername(ctx, request.Username, int32(request.Limit), int32(request.Offset))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return echo.ErrNotFound
@@ -140,6 +163,10 @@ func (h *Handler) GetUsersLikeUsername(c echo.Context) error {
 }
 
 func (h *Handler) DeleteUser(c echo.Context) error {
+	ctx := c.Request().Context()
+	ctx, span := tracer.Start(ctx, "user.DeleteUser")
+	defer span.End()
+
 	var request DeleteUserReq
 	if err := c.Bind(&request); err != nil {
 		h.slog.Error("failed to bind request", slog.String("error", err.Error()))
@@ -151,7 +178,7 @@ func (h *Handler) DeleteUser(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, err.Error())
 	}
 
-	if err := h.service.DeleteUser(context.Background(), int64(request.ID)); err != nil {
+	if err := h.service.DeleteUser(ctx, int64(request.ID)); err != nil {
 		return echo.ErrInternalServerError
 	}
 
@@ -159,6 +186,10 @@ func (h *Handler) DeleteUser(c echo.Context) error {
 }
 
 func (h *Handler) UpdateUser(c echo.Context) error {
+	ctx := c.Request().Context()
+	ctx, span := tracer.Start(ctx, "user.UpdateUser")
+	defer span.End()
+
 	var request UpdateUserReq
 	if err := c.Bind(&request); err != nil {
 		h.slog.Error("failed to bind request", slog.String("error", err.Error()))
@@ -170,7 +201,7 @@ func (h *Handler) UpdateUser(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, err.Error())
 	}
 
-	user, err := h.service.UpdateUser(context.Background(), int64(request.ID), request.Email, request.Username, request.Password)
+	user, err := h.service.UpdateUser(ctx, int64(request.ID), request.Email, request.Username, request.Password)
 	if err != nil {
 		return echo.ErrInternalServerError
 	}

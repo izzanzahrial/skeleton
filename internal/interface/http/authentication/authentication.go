@@ -13,9 +13,12 @@ import (
 	"github.com/izzanzahrial/skeleton/pkg/token"
 	"github.com/jackc/pgx/v5"
 	"github.com/labstack/echo/v4"
+	"go.opentelemetry.io/otel"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
+
+var tracer = otel.Tracer("github.com/izzanzahrial/skeleton/internal/interface/http/auth")
 
 type authService interface {
 	GetuserByEmailOrUsername(ctx context.Context, email, username, password string) (model.User, error)
@@ -33,6 +36,10 @@ func NewHandler(service authService, auth0 *auth0.Authenticator, slog *slog.Logg
 }
 
 func (h *Handler) Login(c echo.Context) error {
+	ctx := c.Request().Context()
+	ctx, span := tracer.Start(ctx, "auth.Login")
+	defer span.End()
+
 	var request LoginReq
 	if err := c.Bind(&request); err != nil {
 		h.slog.Error("fail to bind request", slog.String("error", err.Error()))
@@ -44,7 +51,7 @@ func (h *Handler) Login(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, err)
 	}
 
-	user, err := h.service.GetuserByEmailOrUsername(context.Background(), request.Email, request.Username, request.Password)
+	user, err := h.service.GetuserByEmailOrUsername(ctx, request.Email, request.Username, request.Password)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return c.JSON(http.StatusNotFound, errors.New("user not found"))
@@ -52,11 +59,22 @@ func (h *Handler) Login(c echo.Context) error {
 		return echo.ErrInternalServerError
 	}
 
-	tkn, err := token.NewJWT(user.ID, model.Roles(user.Role))
+	// TODO: think about this more, probably the jwt token doesnt need to be traced
+	tkn, err := func(ctx context.Context) (string, error) {
+		_, span := tracer.Start(ctx, "auth.Login.JWT")
+		defer span.End()
+
+		return token.NewJWT(user.ID, model.Roles(user.Role))
+	}(ctx)
 	if err != nil {
-		h.slog.Error("failed to create token", slog.String("error", err.Error()))
 		return echo.ErrInternalServerError
 	}
+
+	// tkn, err := token.NewJWT(user.ID, model.Roles(user.Role))
+	// if err != nil {
+	// 	h.slog.Error("failed to create token", slog.String("error", err.Error()))
+	// 	return echo.ErrInternalServerError
+	// }
 
 	return c.JSON(http.StatusFound, echo.Map{"user": user, "token": tkn})
 }
