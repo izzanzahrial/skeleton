@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/exaring/otelpgx"
 	"github.com/izzanzahrial/skeleton/config"
 	db "github.com/izzanzahrial/skeleton/db/sqlc"
 	"github.com/izzanzahrial/skeleton/internal/domain/authentication/cache"
@@ -21,19 +22,22 @@ import (
 	"github.com/izzanzahrial/skeleton/internal/service/post"
 	"github.com/izzanzahrial/skeleton/internal/service/user"
 	pkgvalidator "github.com/izzanzahrial/skeleton/pkg/validator"
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/redis/go-redis/v9"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/labstack/echo/otelecho"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
+	"google.golang.org/grpc"
 )
 
 func main() {
@@ -41,7 +45,12 @@ func main() {
 		log.Fatalf("failed to load environment variables: %v", err)
 	}
 
-	exp, err := newOTLPExporter(context.Background())
+	otlpEndpoint := os.Getenv("OTEL_RECEIVER_OTLP_ENDPOINT")
+	if otlpEndpoint == "" {
+		otlpEndpoint = "localhost:4317"
+	}
+
+	exp, err := newGRPCOTLPExporter(context.Background(), otlpEndpoint)
 	if err != nil {
 		log.Fatalf("failed to initialize exporter: %v", err)
 	}
@@ -93,11 +102,26 @@ func main() {
 		slog.Warn("failed to initialize database configuration")
 	}
 
-	conn, err := pgx.Connect(context.Background(), dbCfg.URL())
+	// using pgx
+	// conn, err := pgx.Connect(context.Background(), dbCfg.URL())
+	// if err != nil {
+	// 	slog.Warn("failed to connect to database", slog.String("url", dbCfg.URL()), slog.String("error", err.Error()))
+	// }
+	// defer conn.Close(context.Background())
+
+	// using pgxpool + opentelemetry auto instrumentation library for pgx : https://github.com/exaring/otelpgx
+	cfg, err := pgxpool.ParseConfig(dbCfg.URL())
 	if err != nil {
-		slog.Warn("failed to connect to database", slog.String("url", dbCfg.URL()), slog.String("error", err.Error()))
+		log.Fatalf("failed to parse database config: %v", err)
 	}
-	defer conn.Close(context.Background())
+
+	cfg.ConnConfig.Tracer = otelpgx.NewTracer()
+	// cfg.MaxConns = 200
+
+	conn, err := pgxpool.NewWithConfig(context.Background(), cfg)
+	if err != nil {
+		log.Fatalf("failed to create database connection: %v", err)
+	}
 
 	redisCfg, err := config.NewCache()
 	if err != nil {
@@ -140,7 +164,8 @@ func main() {
 	}
 
 	server := echo.New()
-	server.Use(middleware.Logger())
+	// add echo instrumentation library https://github.com/open-telemetry/opentelemetry-go-contrib/tree/main/instrumentation/github.com/labstack/echo
+	server.Use(otelecho.Middleware("skeleton-service"), middleware.Logger())
 	server.Validator = cv
 
 	port := os.Getenv("PORT")
@@ -177,16 +202,26 @@ func newConsoleExporter() (trace.SpanExporter, error) {
 	return stdouttrace.New(stdouttrace.WithPrettyPrint())
 }
 
-// OTLP Exporter
-func newOTLPExporter(ctx context.Context) (trace.SpanExporter, error) {
+// OTLP HTTP Exporter
+func newHTTPOTLPExporter(ctx context.Context, endpoint string) (trace.SpanExporter, error) {
 	// Change default HTTPS -> HTTP
 	insecureOpt := otlptracehttp.WithInsecure()
 
 	// Update default OTLP reciver endpoint
 	// TODO: create oltp endpoint for grafana
-	endpointOpt := otlptracehttp.WithEndpoint("")
+	endpointOpt := otlptracehttp.WithEndpoint(endpoint)
 
 	return otlptracehttp.New(ctx, insecureOpt, endpointOpt)
+}
+
+// OTLP GRPC Exporter
+func newGRPCOTLPExporter(ctx context.Context, endpoint string) (trace.SpanExporter, error) {
+	insecureOpt := otlptracegrpc.WithInsecure()
+
+	// Update default OTLP reciver endpoint
+	endpointOpt := otlptracegrpc.WithEndpoint(endpoint)
+
+	return otlptracegrpc.New(ctx, insecureOpt, endpointOpt, otlptracegrpc.WithDialOption(grpc.WithBlock()))
 }
 
 // TracerProvider is an OpenTelemetry TracerProvider.
