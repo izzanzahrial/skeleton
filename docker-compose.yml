@@ -42,6 +42,7 @@ services:
       - zookeeper
 
   prometheus:
+    container_name: prometheus
     image: prom/prometheus:latest
     volumes:
       - ./prometheus.yaml:/etc/prometheus/prometheus.yml
@@ -57,10 +58,13 @@ services:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=secret
     volumes:
-      - ./datasource.yml:/etc/grafana/provisioning/datasource/datasource.yml
+      - ./grafana/datasource/datasource.yml:/etc/grafana/provisioning/datasource/datasource.yml
+      - ./grafana/dashboard.yaml:/etc/grafana/provisioning/dashboards/main.yaml
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
       - grafana_data:/var/lib/grafana
 
   jaeger:
+    container_name: jaeger
     image: jaegertracing/all-in-one:1.54
     environment:
       COLLECTOR_ZIPKIN_HOST_PORT: 9411

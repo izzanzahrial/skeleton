@@ -21,6 +21,7 @@ import (
 	"github.com/izzanzahrial/skeleton/internal/service/authentication"
 	"github.com/izzanzahrial/skeleton/internal/service/post"
 	"github.com/izzanzahrial/skeleton/internal/service/user"
+	"github.com/izzanzahrial/skeleton/otlp"
 	pkgvalidator "github.com/izzanzahrial/skeleton/pkg/validator"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
@@ -29,15 +30,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/labstack/echo/otelecho"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
-	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"go.opentelemetry.io/otel/propagation"
-	"go.opentelemetry.io/otel/sdk/resource"
-	"go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
-	"google.golang.org/grpc"
 )
 
 func main() {
@@ -50,19 +43,22 @@ func main() {
 		otlpEndpoint = "localhost:4317"
 	}
 
-	exp, err := newGRPCOTLPExporter(context.Background(), otlpEndpoint)
+	mp, tp, err := otlp.NewMeterAndTraceProvider(context.Background(), otlpEndpoint)
 	if err != nil {
-		log.Fatalf("failed to initialize exporter: %v", err)
+		log.Fatalf("failed to create meter and trace provider: %v", err)
 	}
-
-	// Create a new tracer provider with a batch span processor and the given exporter.
-	tp := newTraceProvider(exp)
+	// TODO: move this to graceful shutdown function
 	defer func() {
 		if err := tp.Shutdown(context.Background()); err != nil {
-			log.Printf("Error shutting down tracer provider: %v", err)
+			log.Printf("error shutting down tracer provider: %v", err)
+		}
+		if err := mp.Shutdown(context.Background()); err != nil {
+			log.Printf("error shutting down metric provider: %v", err)
 		}
 	}()
+
 	otel.SetTracerProvider(tp)
+	otel.SetMeterProvider(mp)
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
 
 	// TODO: move this somewhere else
@@ -192,59 +188,4 @@ func logLevel(level string) slog.Level {
 	default:
 		return slog.LevelInfo
 	}
-}
-
-// List of supported exporters
-// https://opentelemetry.io/docs/instrumentation/go/exporters/
-
-// Console Exporter, only for testing
-func newConsoleExporter() (trace.SpanExporter, error) {
-	return stdouttrace.New(stdouttrace.WithPrettyPrint())
-}
-
-// OTLP HTTP Exporter
-func newHTTPOTLPExporter(ctx context.Context, endpoint string) (trace.SpanExporter, error) {
-	// Change default HTTPS -> HTTP
-	insecureOpt := otlptracehttp.WithInsecure()
-
-	// Update default OTLP reciver endpoint
-	// TODO: create oltp endpoint for grafana
-	endpointOpt := otlptracehttp.WithEndpoint(endpoint)
-
-	return otlptracehttp.New(ctx, insecureOpt, endpointOpt)
-}
-
-// OTLP GRPC Exporter
-func newGRPCOTLPExporter(ctx context.Context, endpoint string) (trace.SpanExporter, error) {
-	insecureOpt := otlptracegrpc.WithInsecure()
-
-	// Update default OTLP reciver endpoint
-	endpointOpt := otlptracegrpc.WithEndpoint(endpoint)
-
-	return otlptracegrpc.New(ctx, insecureOpt, endpointOpt, otlptracegrpc.WithDialOption(grpc.WithBlock()))
-}
-
-// TracerProvider is an OpenTelemetry TracerProvider.
-// It provides Tracers to instrumentation so it can trace operational flow through a system.
-func newTraceProvider(exp trace.SpanExporter) *trace.TracerProvider {
-	// Ensure default SDK resources and the required service name are set.
-	r, err := resource.Merge(
-		resource.Default(),
-		resource.NewWithAttributes(
-			semconv.SchemaURL,
-			semconv.ServiceNameKey.String("skeleton"),
-			semconv.ServiceVersion("v0.1.0"),
-			attribute.String("environment", "demo"),
-		),
-	)
-	if err != nil {
-		panic(err)
-	}
-
-	return trace.NewTracerProvider(
-		// the exporter that we use to send trace or metrics data to the collector
-		trace.WithBatcher(exp),
-		trace.WithResource(r),
-		// handle rate sampling, by 0.5 means only half of the time trace will be sent
-		trace.WithSampler(trace.TraceIDRatioBased(0.5)))
 }

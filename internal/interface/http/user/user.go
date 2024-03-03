@@ -5,14 +5,12 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/izzanzahrial/skeleton/internal/model"
 	"github.com/jackc/pgx/v5"
 	"github.com/labstack/echo/v4"
-	"go.opentelemetry.io/otel"
 )
-
-var tracer = otel.Tracer("github.com/izzanzahrial/skeleton/internal/interface/http/user")
 
 type userService interface {
 	CreateUser(ctx context.Context, email, username, password string) (model.User, error)
@@ -35,6 +33,8 @@ func NewHandler(service userService, slog *slog.Logger) *Handler {
 
 func (h *Handler) Signup(c echo.Context) error {
 	ctx := c.Request().Context()
+	start := time.Now()
+	signUpCounter.Add(ctx, 1)
 	ctx, span := tracer.Start(ctx, "user.Signup")
 	defer span.End()
 
@@ -54,11 +54,15 @@ func (h *Handler) Signup(c echo.Context) error {
 		return echo.ErrInternalServerError
 	}
 
+	duration := time.Since(start)
+	signUpDuration.Record(ctx, duration.Seconds())
 	return c.JSON(http.StatusCreated, user)
 }
 
 func (h *Handler) SignUpAdmin(c echo.Context) error {
 	ctx := c.Request().Context()
+	start := time.Now()
+	signUpAdminCounter.Add(ctx, 1)
 	ctx, span := tracer.Start(ctx, "user.SignUpAdmin")
 	defer span.End()
 
@@ -78,11 +82,15 @@ func (h *Handler) SignUpAdmin(c echo.Context) error {
 		return echo.ErrInternalServerError
 	}
 
+	duration := time.Since(start)
+	signUpAdminDuration.Record(ctx, duration.Seconds())
 	return c.JSON(http.StatusCreated, user)
 }
 
 func (h *Handler) GetUser(c echo.Context) error {
 	ctx := c.Request().Context()
+	start := time.Now()
+	getUserCounter.Add(ctx, 1)
 	ctx, span := tracer.Start(ctx, "user.GetUser")
 	defer span.End()
 
@@ -105,11 +113,15 @@ func (h *Handler) GetUser(c echo.Context) error {
 		return echo.ErrInternalServerError
 	}
 
+	duration := time.Since(start)
+	getUserDuration.Record(ctx, duration.Seconds())
 	return c.JSON(http.StatusFound, user)
 }
 
 func (h *Handler) GetUsersByRole(c echo.Context) error {
 	ctx := c.Request().Context()
+	start := time.Now()
+	getUserByRoleCounter.Add(ctx, 1)
 	ctx, span := tracer.Start(ctx, "user.GetUsersByRole")
 	defer span.End()
 
@@ -132,11 +144,15 @@ func (h *Handler) GetUsersByRole(c echo.Context) error {
 		return echo.ErrInternalServerError
 	}
 
+	duration := time.Since(start)
+	getUserByRoleDuration.Record(ctx, duration.Seconds())
 	return c.JSON(http.StatusOK, users)
 }
 
 func (h *Handler) GetUsersLikeUsername(c echo.Context) error {
 	ctx := c.Request().Context()
+	start := time.Now()
+	getUsersLikeUsernameCounter.Add(ctx, 1)
 	ctx, span := tracer.Start(ctx, "user.GetUsersLikeUsername")
 	defer span.End()
 
@@ -159,11 +175,15 @@ func (h *Handler) GetUsersLikeUsername(c echo.Context) error {
 		return echo.ErrInternalServerError
 	}
 
+	duration := time.Since(start)
+	getUsersLikeUsernameDuration.Record(ctx, duration.Seconds())
 	return c.JSON(http.StatusOK, users)
 }
 
 func (h *Handler) DeleteUser(c echo.Context) error {
 	ctx := c.Request().Context()
+	start := time.Now()
+	deleteUserCounter.Add(ctx, 1)
 	ctx, span := tracer.Start(ctx, "user.DeleteUser")
 	defer span.End()
 
@@ -182,11 +202,15 @@ func (h *Handler) DeleteUser(c echo.Context) error {
 		return echo.ErrInternalServerError
 	}
 
+	duration := time.Since(start)
+	deleteUserDuration.Record(ctx, duration.Seconds())
 	return c.JSON(http.StatusOK, nil)
 }
 
 func (h *Handler) UpdateUser(c echo.Context) error {
 	ctx := c.Request().Context()
+	start := time.Now()
+	updateUserCounter.Add(ctx, 1)
 	ctx, span := tracer.Start(ctx, "user.UpdateUser")
 	defer span.End()
 
@@ -206,5 +230,7 @@ func (h *Handler) UpdateUser(c echo.Context) error {
 		return echo.ErrInternalServerError
 	}
 
+	duration := time.Since(start)
+	updateUserDuration.Record(ctx, duration.Seconds())
 	return c.JSON(http.StatusCreated, user)
 }

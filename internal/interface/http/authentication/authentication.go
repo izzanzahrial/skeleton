@@ -7,18 +7,16 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/izzanzahrial/skeleton/internal/interface/http/auth0"
 	"github.com/izzanzahrial/skeleton/internal/model"
 	"github.com/izzanzahrial/skeleton/pkg/token"
 	"github.com/jackc/pgx/v5"
 	"github.com/labstack/echo/v4"
-	"go.opentelemetry.io/otel"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
-
-var tracer = otel.Tracer("github.com/izzanzahrial/skeleton/internal/interface/http/auth")
 
 type authService interface {
 	GetuserByEmailOrUsername(ctx context.Context, email, username, password string) (model.User, error)
@@ -37,6 +35,8 @@ func NewHandler(service authService, auth0 *auth0.Authenticator, slog *slog.Logg
 
 func (h *Handler) Login(c echo.Context) error {
 	ctx := c.Request().Context()
+	start := time.Now()
+	loginCounter.Add(ctx, 1)
 	ctx, span := tracer.Start(ctx, "auth.Login")
 	defer span.End()
 
@@ -76,6 +76,8 @@ func (h *Handler) Login(c echo.Context) error {
 	// 	return echo.ErrInternalServerError
 	// }
 
+	duration := time.Since(start)
+	loginDuration.Record(ctx, duration.Seconds())
 	return c.JSON(http.StatusFound, echo.Map{"user": user, "token": tkn})
 }
 

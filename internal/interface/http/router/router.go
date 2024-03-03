@@ -36,7 +36,7 @@ func mapUserRoutes(e *echo.Group, h *handlers.Handlers) {
 	e.GET("/users/:role", h.User.GetUsersByRole, middleware.IsAuthenticated(), middleware.IsAuthorize)
 	e.GET("/users", h.User.GetUsersLikeUsername, middleware.IsAuthenticated(), middleware.IsAuthorize)
 	e.PATCH("/users/:id", h.User.UpdateUser)
-	e.DELETE("/users", h.User.DeleteUser)
+	e.DELETE("/users", h.User.DeleteUser, middleware.IsAuthenticated(), middleware.IsAuthorize)
 }
 
 func mapPostRoute(e *echo.Group, h *handlers.Handlers) {
