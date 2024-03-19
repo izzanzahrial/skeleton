@@ -58,10 +58,14 @@ services:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=secret
     volumes:
-      - ./grafana/datasource/datasource.yml:/etc/grafana/provisioning/datasource/datasource.yml
-      - ./grafana/dashboard.yaml:/etc/grafana/provisioning/dashboards/main.yaml
-      - ./grafana/dashboards:/var/lib/grafana/dashboards
       - grafana_data:/var/lib/grafana
+    # copy dashboard internal configuration to grafana dashboard configuration
+      - ./grafana/dashboard.yaml:/etc/grafana/provisioning/dashboards/dashboard.yaml
+    # copy all dashboard internal to grafana dashboard
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    # copy datasource internal to grafana datasource
+      - ./grafana/datasource/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
+      
 
   jaeger:
     container_name: jaeger
@@ -97,6 +101,13 @@ services:
     depends_on:
       - jaeger
       - prometheus
+      
+  influxdb:
+    image: influxdb:1.8
+    ports:
+      - "8086:8086"
+    environment:
+      - INFLUXDB_DB=k6
 
 volumes:
   pgdata:
