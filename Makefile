@@ -46,3 +46,6 @@ sqlc: ## Generate query into golang using sqlc
 run: up-migration ## Run the server
 	@echo 'Running the server...'
 	@go run cmd/server/main.go
+
+k6: ## Run k6 to test the server
+	@k6 run script/test.js --out influxdb=http://localhost:8086/k6
