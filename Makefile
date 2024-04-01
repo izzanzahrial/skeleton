@@ -49,3 +49,6 @@ run: up-migration ## Run the server
 
 k6: ## Run k6 to test the server
 	@k6 run script/test.js --out influxdb=http://localhost:8086/k6
+
+lint: ## Run golangci-lint
+	@golangci-lint run
